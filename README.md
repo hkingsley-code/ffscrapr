@@ -112,4 +112,4 @@ The R code for this package is released as open source under the [MIT
 license](https://ffscrapr.ffverse.com/LICENSE.html).
 
 The APIs and data accessed by this package belong to their respective
-owners, and are governed by their terms of use.
+owners, and are governed by their terms of use
