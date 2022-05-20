@@ -1,6 +1,6 @@
 Type: Package
-Package: ffscrapr
-Title: API Client for Fantasy Football League Platforms
+Package: fbscrapr
+Title: API Client for Fantasy Baseball League Platforms
 Version: 1.4.7
 Authors@R: 
     c(person(given = "Tan",
