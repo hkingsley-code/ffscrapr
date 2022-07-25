@@ -23,33 +23,15 @@ ff_scoring.espn_conn <- function(conn) {
     tidyr::unnest_wider(1) %>%
     dplyr::mutate(stat = .espn_stat_map()[as.character(.data$statId)] %>% unname())
 
-  overrides <-
+  main_stats <-
     scoring_rules %>%
-    dplyr::mutate(
-      override_pos = purrr::map(.data$pointsOverrides, names),
-      pos = .espn_pos_map()[as.character(.data$override_pos)] %>% unname(),
-      points = purrr::map_dbl(.data$pointsOverrides, purrr::pluck, 1, .default = NA_real_)
-    ) %>%
-    tidyr::unnest("override_pos") %>%
-    dplyr::filter(!is.na(.data$points)) %>%
+    tidyr::expand_grid(pos = c("C","1B","2B","SS","3B","OF","SP","RP","UTIL","IF")) %>%
     dplyr::select(
       "pos",
       "points",
       "stat_id" = "statId",
       "stat_name" = "stat"
     )
-
-  main_stats <-
-    scoring_rules %>%
-    tidyr::expand_grid(pos = c("QB", "RB", "WR", "TE", "K", "P", "DT", "DE", "LB", "CB", "S", "HC", "DST")) %>%
-    dplyr::select(
-      "pos",
-      "points",
-      "stat_id" = "statId",
-      "stat_name" = "stat"
-    ) %>%
-    dplyr::anti_join(overrides, by = "pos", "stat_id") %>%
-    dplyr::bind_rows(overrides)
 
   return(main_stats)
 }
