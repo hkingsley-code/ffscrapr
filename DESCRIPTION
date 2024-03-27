@@ -1,5 +1,5 @@
 Type: Package
-Package: fbscrapr
+Package: ffscrapr
 Title: API Client for Fantasy Baseball League Platforms
 Version: 1.4.7
 Authors@R: 
