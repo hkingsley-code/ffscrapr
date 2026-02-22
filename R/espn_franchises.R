@@ -17,10 +17,17 @@
 #' @describeIn ff_franchises ESPN: returns franchise and division information.
 #' @export
 ff_franchises.espn_conn <- function(conn) {
+  # Try mTeam first, fall back to mRoster (mTeam is not supported by all ESPN game types)
   team_endpoint <- espn_getendpoint(conn, view = "mTeam") %>%
     purrr::pluck("content")
 
   teams_raw <- purrr::pluck(team_endpoint, "teams")
+
+  if (is.null(teams_raw) || length(teams_raw) == 0) {
+    team_endpoint <- espn_getendpoint(conn, view = "mRoster") %>%
+      purrr::pluck("content")
+    teams_raw <- purrr::pluck(team_endpoint, "teams")
+  }
 
   if (is.null(teams_raw) || length(teams_raw) == 0) {
     warning(
