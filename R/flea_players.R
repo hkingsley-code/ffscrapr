@@ -1,6 +1,6 @@
 #' Fleaflicker players library
 #'
-#' A cached table of Fleaflicker NFL players. Will store in memory for each session!
+#' A cached table of Fleaflicker MLB players. Will store in memory for each session!
 #' (via memoise in zzz.R)
 #'
 #' @param conn a conn object created by `ff_connect()`
@@ -25,7 +25,7 @@ fleaflicker_players <- function(conn, page_limit = NULL) {
 
   initial_results <- fleaflicker_getendpoint(
     endpoint = "FetchPlayerListing",
-    sport = "NFL",
+    sport = "MLB",
     league_id = conn$league_id,
     external_id_type = "SPORTRADAR",
     result_offset = result_offset
@@ -41,7 +41,7 @@ fleaflicker_players <- function(conn, page_limit = NULL) {
   while (!is.null(result_offset) && page_count < page_limit) {
     results <- fleaflicker_getendpoint(
       endpoint = "FetchPlayerListing",
-      sport = "NFL",
+      sport = "MLB",
       league_id = conn$league_id,
       external_id_type = "SPORTRADAR",
       result_offset = result_offset

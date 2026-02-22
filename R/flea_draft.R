@@ -18,7 +18,7 @@
 #' @export
 ff_draft.flea_conn <- function(conn, ...) {
   draftboard <- fleaflicker_getendpoint("FetchLeagueDraftBoard",
-    sport = "NFL",
+    sport = "MLB",
     season = conn$season,
     league_id = conn$league_id
   ) %>%

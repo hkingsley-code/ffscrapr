@@ -42,7 +42,7 @@ ff_connect <- function(platform = "mfl", league_id = NULL, ...) {
 
 #' Get League Summary
 #'
-#' This function returns a tidy dataframe of common league settings, including details like "1QB" or "2QB/SF", scoring, best ball, team count, IDP etc. This is potentially useful in summarising the features of multiple leagues.
+#' This function returns a tidy dataframe of common league settings, including scoring type, team count, roster settings, etc. This is potentially useful in summarising the features of multiple leagues.
 #'
 #' @param conn a conn object created by `ff_connect()`
 #'
@@ -235,7 +235,7 @@ ff_draftpicks.default <- function(conn, ...) {
 
 #' Get Schedule
 #'
-#' This function returns a tidy dataframe with one row for every team for every weekly matchup
+#' This function returns a tidy dataframe with one row for every team for every matchup period
 #'
 #' @param conn a conn object created by `ff_connect()`
 #' @param ... additional args passed to each platform
@@ -321,16 +321,13 @@ ff_starter_positions.default <- function(conn, ...) {
 
 #' Get League-Specific Scoring History
 #'
-#' (Experimental!) This function reads your league's ff_scoring rules and maps them to nflfastr week-level data.
-#' Not all of the scoring rules from your league may have nflfastr equivalents, but most of the common ones are available!
+#' (Experimental!) This function reads your league's ff_scoring rules and maps them to historical player stats.
 #'
 #' @param conn a conn object created by `ff_connect()`
-#' @param season a numeric vector of seasons (earliest available year is 1999, default is 1999:2020)
+#' @param season a numeric vector of seasons
 #' @param ... other arguments
 #'
-#' @seealso <https://www.nflfastr.com/reference/load_player_stats.html>
-#'
-#' @return A tidy dataframe of weekly fantasy scoring data, one row per player per week
+#' @return A tidy dataframe of fantasy scoring data, one row per player per scoring period
 #'
 #' @export ff_scoringhistory
 

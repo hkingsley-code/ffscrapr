@@ -3,7 +3,7 @@
 
 # ffscrapr <a href='#'><img src="man/figures/logo.svg" align="right" width="25%" min-width="120px"/></a>
 
-*An R Client for Fantasy Football League APIs*
+*An R Client for Fantasy Baseball League APIs*
 
 <!-- badges: start -->
 
@@ -24,11 +24,10 @@ discord](https://img.shields.io/discord/789805604076126219?color=7289da&label=nf
 
 <!-- badges: end -->
 
-Helps access various Fantasy Football APIs (currently MFL, Sleeper,
-Fleaflicker, and ESPN - eventually Yahoo, potentially others) by
-handling authentication/rate-limiting/caching, forming appropriate
-calls, and returning tidy dataframes which can be easily connected to
-other data sources.
+Helps access various Fantasy Baseball APIs (currently ESPN and
+Fleaflicker) by handling authentication/rate-limiting/caching, forming
+appropriate calls, and returning tidy dataframes which can be easily
+connected to other data sources.
 
 ### Installation
 
@@ -86,8 +85,8 @@ performance](https://ffscrapr.ffverse.com/articles/ffscrapr_caching.html).
 
 The best places to get help on this package are:
 
--   the [nflverse discord](https://discord.com/invite/5Er2FBnnQa) (for
-    both this package as well as anything R/NFL related)
+-   the [ffverse discord](https://discord.com/invite/5Er2FBnnQa) (for
+    both this package as well as anything R/fantasy sports related)
 -   opening [an
     issue](https://github.com/ffverse/ffscrapr/issues/new/choose)
 

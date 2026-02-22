@@ -5,7 +5,7 @@
 #' This is for the starting lineup specifically - primary positions is accessible via `.espn_pos_map`
 #'
 #' @keywords internal
-#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/football/constant.py>
+#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/constant.py>
 .espn_lineupslot_map <- function() {
   c(
     '0' = 'C',
@@ -105,7 +105,7 @@
 #' Abbreviations are consistently three letters.
 #'
 #' @keywords internal
-#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/football/constant.py>
+#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/constant.py>
 .espn_team_map <- function() {
   c(
     '0' = 'FA',
@@ -180,7 +180,7 @@
 #' ESPN Stat ID map
 #'
 #' @keywords internal
-#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/football/constant.py>
+#' @seealso <https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/constant.py>
 .espn_stat_map <- function() {
   c(
     '0' = 'AB',

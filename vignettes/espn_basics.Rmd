@@ -32,7 +32,7 @@ tryCatch(expr = {
 httptest::use_mock_api()
 ```
 
-In this vignette, I'll walk through how to get started with a basic dynasty value analysis on ESPN, pulling in roster data.
+In this vignette, I'll walk through how to get started with a basic fantasy baseball analysis on ESPN, pulling in roster data.
 
 We'll start by loading the packages:
 
@@ -42,7 +42,7 @@ We'll start by loading the packages:
   library(tidyr)
 ```
 
-In ESPN, you can find the league ID by looking in the URL - it's the number immediately after ?leagueId in this example URL: https://fantasy.espn.com/football/team?leagueId=899513&seasonId=2020
+In ESPN, you can find the league ID by looking in the URL - it's the number immediately after ?leagueId in this example URL: https://fantasy.espn.com/baseball/team?leagueId=85601&seasonId=2024
 
 Let's set up a connection to this league: 
 

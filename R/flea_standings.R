@@ -22,7 +22,7 @@ ff_standings.flea_conn <- function(conn, include_allplay = TRUE, include_potenti
   standings <- fleaflicker_getendpoint("FetchLeagueStandings",
     league_id = conn$league_id,
     season = conn$season,
-    sport = "NFL"
+    sport = "MLB"
   ) %>%
     purrr::pluck("content", "divisions") %>%
     tibble::tibble() %>%
@@ -82,7 +82,7 @@ ff_standings.flea_conn <- function(conn, include_allplay = TRUE, include_potenti
 
 .flea_potentialpointsweek <- function(week, game_id, conn) {
   x <- fleaflicker_getendpoint("FetchLeagueBoxscore",
-    sport = "NFL",
+    sport = "MLB",
     scoring_period = week,
     fantasy_game_id = game_id,
     league_id = conn$league_id

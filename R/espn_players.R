@@ -1,6 +1,6 @@
 #' ESPN players library
 #'
-#' A cached table of ESPN NFL players. Will store in memory for each session!
+#' A cached table of ESPN MLB players. Will store in memory for each session!
 #' (via memoise in zzz.R)
 #'
 #' @param conn a connection object created by `espn_connect` or `ff_connect()`

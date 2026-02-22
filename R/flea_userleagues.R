@@ -41,7 +41,7 @@ ff_userleagues.flea_conn <- function(conn = NULL, user_email = NULL, season = NU
 fleaflicker_userleagues <- function(user_email, season = NULL) {
   if (is.null(season)) season <- .fn_choose_season()
 
-  df_leagues <- fleaflicker_getendpoint("FetchUserLeagues", email = user_email, season = season, sport = "NFL") %>%
+  df_leagues <- fleaflicker_getendpoint("FetchUserLeagues", email = user_email, season = season, sport = "MLB") %>%
     purrr::pluck("content", "leagues") %>%
     purrr::map(`[`, c("name", "id", "ownedTeam")) %>%
     tibble::tibble() %>%

@@ -20,7 +20,7 @@
 
 ff_schedule.flea_conn <- function(conn, week = 1:17, ...) {
   weeks <- fleaflicker_getendpoint("FetchLeagueScoreboard",
-    sport = "NFL",
+    sport = "MLB",
     league_id = conn$league_id,
     season = conn$season
   ) %>%
@@ -37,7 +37,7 @@ ff_schedule.flea_conn <- function(conn, week = 1:17, ...) {
 #'
 .flea_schedule <- function(week, conn) {
   schedule_raw <- fleaflicker_getendpoint("FetchLeagueScoreboard",
-    sport = "NFL",
+    sport = "MLB",
     league_id = conn$league_id,
     scoring_period = week,
     season = conn$season

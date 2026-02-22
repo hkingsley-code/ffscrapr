@@ -23,7 +23,7 @@ ff_playerscores.flea_conn <- function(conn, page_limit = NULL, ...) {
 
   initial_results <- fleaflicker_getendpoint(
     endpoint = "FetchPlayerListing",
-    sport = "NFL",
+    sport = "MLB",
     league_id = conn$league_id,
     external_id_type = "SPORTRADAR",
     result_offset = result_offset
@@ -39,7 +39,7 @@ ff_playerscores.flea_conn <- function(conn, page_limit = NULL, ...) {
   while (!is.null(result_offset) && page_count < page_limit) {
     results <- fleaflicker_getendpoint(
       endpoint = "FetchPlayerListing",
-      sport = "NFL",
+      sport = "MLB",
       league_id = conn$league_id,
       external_id_type = "SPORTRADAR",
       result_offset = result_offset
