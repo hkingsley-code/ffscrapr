@@ -39,14 +39,14 @@ espn_getendpoint <- function(conn, ..., x_fantasy_filter = NULL) {
 
   if (as.numeric(conn$season) < 2018) {
     url_query <- httr::modify_url(
-      url = glue::glue("https://fantasy.espn.com/apis/v3/games/FLB/leagueHistory/{conn$league_id}?seasonId={conn$season}"),
+      url = glue::glue("https://fantasy.espn.com/apis/v3/games/flb/leagueHistory/{conn$league_id}?seasonId={conn$season}"),
       query = list(...)
     )
   }
 
   if (as.numeric(conn$season) >= 2018) {
     url_query <- httr::modify_url(
-      url = glue::glue("https://fantasy.espn.com/apis/v3/games/FLB/seasons/{conn$season}/segments/0/leagues/{conn$league_id}"),
+      url = glue::glue("https://fantasy.espn.com/apis/v3/games/flb/seasons/{conn$season}/segments/0/leagues/{conn$league_id}"),
       query = list(...)
     )
   }
@@ -102,6 +102,8 @@ espn_getendpoint_raw <- function(conn, url_query, ...) {
     warning(glue::glue("ESPN API request failed with <{httr::http_status(response)$message}> \n
                     while calling <{url_query}>"), call. = FALSE)
   }
+
+  parsed <- NULL
 
   if (httr::http_type(response) != "application/json") {
     warning(glue::glue("ESPN API did not return json while calling {url_query}"),
