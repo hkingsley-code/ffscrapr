@@ -109,8 +109,10 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     tidyr::unnest_longer("entries") %>%
     dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
     tidyr::hoist("entries", "player_id" = "playerId", "lineup_id" = "lineupSlotId", "player_data" = "playerPoolEntry") %>%
+    dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
     dplyr::select(-"player_data") %>%
+    dplyr::filter(purrr::map_lgl(.data$player, is.list)) %>%
     tidyr::hoist("player",
                  "eligible_lineup_slots" = "eligibleSlots",
                  "player_name" = "fullName",
