@@ -101,10 +101,13 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     tidyr::hoist(1, "week" = "matchupPeriodId", "home", "away") %>%
     dplyr::filter(.data$week == .env$week) %>%
     tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
+    dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
     tidyr::hoist("team", "starting_lineup" = "rosterForCurrentScoringPeriod", "franchise_id" = "teamId") %>%
     dplyr::select(-"team", -"x") %>%
+    dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list)) %>%
     tidyr::hoist("starting_lineup", "franchise_score" = "appliedStatTotal", "entries") %>%
     tidyr::unnest_longer("entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
     tidyr::hoist("entries", "player_id" = "playerId", "lineup_id" = "lineupSlotId", "player_data" = "playerPoolEntry") %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
     dplyr::select(-"player_data") %>%
