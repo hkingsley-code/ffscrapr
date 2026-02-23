@@ -68,6 +68,7 @@ ff_franchises.espn_conn <- function(conn) {
     tidyr::hoist(
       .col = 1,
       "franchise_id"       = "id",
+      "franchise_name"     = "name",
       "franchise_abbrev"   = "abbrev",
       "franchise_location" = "location",
       "franchise_nickname" = "nickname",
@@ -77,7 +78,10 @@ ff_franchises.espn_conn <- function(conn) {
     ) %>%
     dplyr::left_join(members, by = "user_id") %>%
     dplyr::mutate(
-      franchise_name = paste(.data$franchise_location, .data$franchise_nickname)
+      franchise_name = dplyr::coalesce(
+        .data$franchise_name,
+        trimws(paste(.data$franchise_location, .data$franchise_nickname))
+      )
     ) %>%
     dplyr::select(dplyr::any_of(c(
       "franchise_id",
