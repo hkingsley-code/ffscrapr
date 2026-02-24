@@ -100,7 +100,11 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     return(NULL)
   }
 
-  starters <- purrr::map_dfr(run_weeks, .espn_week_starter, conn) %>%
+  raw_starters <- purrr::map_dfr(run_weeks, .espn_week_starter, conn)
+
+  if (nrow(raw_starters) == 0) return(NULL)
+
+  starters <- raw_starters %>%
     dplyr::mutate(
       lineup_slot = .espn_lineupslot_map()[as.character(.data$lineup_id)] %>% unname(),
       pos = .espn_pos_map()[as.character(.data$pos)] %>% unname(),
