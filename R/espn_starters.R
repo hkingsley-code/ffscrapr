@@ -156,7 +156,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     "?scoringPeriodId={week}&view=mMatchupScore&view=mBoxscore&view=mSettings&view=mRosterSettings"
   )
 
-  week_scores <- espn_getendpoint_raw(conn, url_query) %>%
+  raw <- espn_getendpoint_raw(conn, url_query) %>%
     purrr::pluck("content", "schedule") %>%
     tibble::tibble() %>%
     purrr::set_names("x") %>%
@@ -166,7 +166,11 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
     tidyr::hoist("team", "starting_lineup" = "rosterForCurrentScoringPeriod", "franchise_id" = "teamId") %>%
     dplyr::select(-"team", -"x") %>%
-    dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list)) %>%
+    dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list))
+
+  if (nrow(raw) == 0) return(tibble::tibble())
+
+  week_scores <- raw %>%
     tidyr::hoist("starting_lineup", "franchise_score" = "appliedStatTotal", "entries") %>%
     tidyr::unnest_longer("entries") %>%
     dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
