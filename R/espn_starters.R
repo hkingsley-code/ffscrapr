@@ -84,9 +84,11 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   checkmate::assert_numeric(weeks)
 
-  max_week <- .espn_week_checkmax(conn)
+  checkmax <- .espn_week_checkmax(conn)
+  max_week              <- checkmax$max_week
+  matchup_period_length <- checkmax$matchup_period_length
 
-  run_weeks <- weeks[weeks < max_week]
+  run_weeks <- weeks[weeks <= max_week]
 
   if (length(run_weeks) == 0) {
     warning(
@@ -100,7 +102,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     return(NULL)
   }
 
-  raw_starters <- purrr::map_dfr(run_weeks, .espn_week_starter, conn)
+  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_period_length))
 
   if (nrow(raw_starters) == 0) return(NULL)
 
@@ -148,16 +150,21 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   final_week <- settings %>%
     purrr::pluck("content", "status", "finalScoringPeriod")
 
-  max_week <- min(current_week, final_week, na.rm = TRUE)
+  matchup_period_length <- settings %>%
+    purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriodLength", .default = 1L)
 
-  return(max_week)
+  max_scoring_period <- min(current_week, final_week, na.rm = TRUE)
+  max_matchup_period <- floor(max_scoring_period / matchup_period_length)
+
+  list(max_week = max_matchup_period, matchup_period_length = matchup_period_length)
 }
 
-.espn_week_starter <- function(week, conn) {
+.espn_week_starter <- function(week, conn, matchup_period_length = 1L) {
+  scoring_period_id <- week * matchup_period_length
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
-    "?scoringPeriodId={week}&view=mMatchupScore&view=mBoxscore&view=mSettings&view=mRosterSettings"
+    "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore&view=mSettings&view=mRosterSettings"
   )
 
   raw <- espn_getendpoint_raw(conn, url_query) %>%
