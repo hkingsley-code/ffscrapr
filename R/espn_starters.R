@@ -1,5 +1,39 @@
 #### ESPN ff_starters ####
 
+#' Get total hitter points scored by each team in a given week
+#'
+#' Filters started players to hitting lineup slots only (excludes SP, RP, P,
+#' BE, and IL) and returns the sum of points scored per team per week.
+#'
+#' @param conn the connection object created by `ff_connect()`
+#' @param weeks which weeks to retrieve, a number or numeric vector
+#' @param ... other arguments passed to `ff_starters()`
+#'
+#' @return a tibble with columns: week, franchise_id, franchise_name, hitter_points
+#'
+#' @examples
+#' \donttest{
+#' try({
+#'   conn <- espn_connect(season = 2020, league_id = 1178049)
+#'   espn_hitter_points(conn, weeks = 1)
+#' })
+#' }
+#'
+#' @export
+espn_hitter_points <- function(conn, weeks = 1:26, ...) {
+  .hitter_slots <- c(
+    "C", "1B", "2B", "3B", "SS", "OF",
+    "2B/SS", "1B/3B", "LF", "CF", "RF", "DH", "UTIL", "IF"
+  )
+
+  ff_starters(conn, weeks = weeks, ...) %>%
+    dplyr::filter(.data$lineup_slot %in% .hitter_slots) %>%
+    dplyr::group_by(.data$week, .data$franchise_id, .data$franchise_name) %>%
+    dplyr::summarise(hitter_points = sum(.data$player_score, na.rm = TRUE), .groups = "drop")
+}
+
+
+
 #' Get starters and bench
 #'
 #' @param conn the connection object created by `ff_connect()`
