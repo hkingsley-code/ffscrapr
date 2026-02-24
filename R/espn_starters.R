@@ -173,12 +173,24 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   week_scores <- raw %>%
     tidyr::hoist("starting_lineup", "franchise_score" = "appliedStatTotal", "entries") %>%
     tidyr::unnest_longer("entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list))
+
+  if (nrow(week_scores) == 0) return(tibble::tibble())
+
+  week_scores <- week_scores %>%
     tidyr::hoist("entries", "player_id" = "playerId", "lineup_id" = "lineupSlotId", "player_data" = "playerPoolEntry") %>%
-    dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
+    dplyr::filter(purrr::map_lgl(.data$player_data, is.list))
+
+  if (nrow(week_scores) == 0) return(tibble::tibble())
+
+  week_scores <- week_scores %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
     dplyr::select(-"player_data") %>%
-    dplyr::filter(purrr::map_lgl(.data$player, is.list)) %>%
+    dplyr::filter(purrr::map_lgl(.data$player, is.list))
+
+  if (nrow(week_scores) == 0) return(tibble::tibble())
+
+  week_scores <- week_scores %>%
     tidyr::hoist("player",
                  "eligible_lineup_slots" = "eligibleSlots",
                  "player_name" = "fullName",
