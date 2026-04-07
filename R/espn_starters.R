@@ -196,22 +196,43 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   schedule <- purrr::pluck(api_result, "content", "schedule")
   message("[week_starter] schedule length=", length(schedule))
 
-  raw <- schedule %>%
+  raw_tbl <- schedule %>%
     tibble::tibble() %>%
     purrr::set_names("x") %>%
     tidyr::hoist(1, "week" = "matchupPeriodId", "home", "away")
 
-  message("[week_starter] matchupPeriodIds in response: ", paste(unique(raw$week), collapse=", "))
+  message("[week_starter] matchupPeriodIds in response: ", paste(unique(raw_tbl$week), collapse=", "))
 
-  raw <- raw %>%
-    dplyr::filter(.data$week == .env$week) %>%
-    tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
-    dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
-    tidyr::hoist("team", "starting_lineup" = "rosterForCurrentScoringPeriod", "franchise_id" = "teamId") %>%
-    dplyr::select(-"team", -"x") %>%
-    dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list))
+  week_rows <- dplyr::filter(raw_tbl, .data$week == .env$week)
+  message("[week_starter] rows for week=", week, ": ", nrow(week_rows))
 
-  message("[week_starter] rows after filtering week=", week, " and is.list guards: ", nrow(raw))
+  if (nrow(week_rows) > 0 && !is.null(week_rows$home[[1]])) {
+    message("[week_starter] first home team fields: ",
+            paste(names(week_rows$home[[1]]), collapse=", "))
+  }
+
+  pivoted <- tidyr::pivot_longer(week_rows, c(.data$home, .data$away),
+                                  names_to = NULL, values_to = "team")
+  list_teams <- dplyr::filter(pivoted, purrr::map_lgl(.data$team, is.list))
+  message("[week_starter] rows after pivot/is.list: ", nrow(list_teams))
+
+  if (nrow(list_teams) > 0) {
+    message("[week_starter] first team fields: ",
+            paste(names(list_teams$team[[1]]), collapse=", "))
+  }
+
+  if (nrow(list_teams) == 0) return(tibble::tibble())
+
+  hoisted <- tidyr::hoist(list_teams, "team",
+                           "starting_lineup" = "rosterForCurrentScoringPeriod",
+                           "franchise_id" = "teamId") %>%
+    dplyr::select(-"team", -"x")
+
+  message("[week_starter] is.list(starting_lineup): ",
+          sum(purrr::map_lgl(hoisted$starting_lineup, is.list)),
+          " / ", nrow(hoisted))
+
+  raw <- dplyr::filter(hoisted, purrr::map_lgl(.data$starting_lineup, is.list))
 
   if (nrow(raw) == 0) return(tibble::tibble())
 
