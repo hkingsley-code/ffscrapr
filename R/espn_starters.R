@@ -192,17 +192,34 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
 
-  raw <- tibble::tibble(x = schedule) %>%
+  tbl <- tibble::tibble(x = schedule) %>%
     tidyr::hoist("x", "week" = "matchupPeriodId", "home", "away") %>%
-    dplyr::filter(.data$week == .env$week) %>%
-    tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
-    dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
+    dplyr::filter(.data$week == .env$week)
+  message("[D] rows for week=", week, ": ", nrow(tbl))
+
+  pivoted <- tidyr::pivot_longer(tbl, c(.data$home, .data$away),
+                                  names_to = NULL, values_to = "team")
+  list_teams <- dplyr::filter(pivoted, purrr::map_lgl(.data$team, is.list))
+  message("[D] rows after is.list(team): ", nrow(list_teams))
+
+  if (nrow(list_teams) > 0) {
+    t1 <- list_teams$team[[1]]
+    message("[D] team keys: ", paste(names(t1), collapse=", "))
+    rfmp <- t1$rosterForMatchupPeriod
+    message("[D] rosterForMatchupPeriod type: ", class(rfmp)[1],
+            " is.list: ", is.list(rfmp))
+    if (is.list(rfmp)) message("[D] rosterForMatchupPeriod keys: ",
+                               paste(names(rfmp), collapse=", "))
+  }
+
+  raw <- list_teams %>%
     tidyr::hoist("team",
                  "franchise_id"    = "teamId",
                  "franchise_score" = "totalPoints",
                  "starting_lineup" = "rosterForMatchupPeriod") %>%
     dplyr::select(-"team", -"x") %>%
     dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list))
+  message("[D] rows after is.list(starting_lineup): ", nrow(raw))
 
   if (nrow(raw) == 0) return(tibble::tibble())
 
