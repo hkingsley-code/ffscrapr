@@ -191,15 +191,28 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   raw_content <- espn_getendpoint_raw(conn, url_query)
   schedule <- purrr::pluck(raw_content, "content", "schedule")
 
-  # Print schedule home keys directly from raw response (before any transformation)
   if (!is.null(schedule) && length(schedule) > 0) {
-    message("[D] raw schedule[[1]] matchupPeriodId=", schedule[[1]]$matchupPeriodId,
-            "  home keys: ", paste(names(schedule[[1]]$home), collapse=", "))
-    # Find all entries that have rosterForMatchupPeriod
+    # Which matchup weeks have rosterForMatchupPeriod?
     has_rfmp <- purrr::map_lgl(schedule, ~!is.null(.x$home$rosterForMatchupPeriod))
-    msg_ids  <- purrr::map_int(schedule[has_rfmp], ~.x$matchupPeriodId)
+    rfmp_weeks <- purrr::map_int(schedule[has_rfmp], ~.x$matchupPeriodId)
     message("[D] matchupPeriodIds with rosterForMatchupPeriod: ",
-            paste(unique(msg_ids), collapse=", "))
+            paste(unique(rfmp_weeks), collapse=", "))
+
+    # Find a week-2 entry and show its pointsByScoringPeriod keys
+    week2_entries <- purrr::keep(schedule, ~isTRUE(.x$matchupPeriodId == 2))
+    if (length(week2_entries) > 0) {
+      pbs <- week2_entries[[1]]$home$pointsByScoringPeriod
+      message("[D] week-2 pointsByScoringPeriod keys (daily scoring periods): ",
+              paste(names(pbs), collapse=", "))
+    }
+
+    # Show raw matchupPeriods for first 3 entries
+    mp <- purrr::pluck(raw_content, "content", "settings", "scheduleSettings", "matchupPeriods")
+    if (!is.null(mp)) {
+      for (i in seq_len(min(3, length(mp)))) {
+        message("[D] matchupPeriods[[", i, "]]: ", paste(as.integer(mp[[i]]), collapse=", "))
+      }
+    }
   }
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
