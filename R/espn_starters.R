@@ -193,8 +193,13 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   # Print schedule home keys directly from raw response (before any transformation)
   if (!is.null(schedule) && length(schedule) > 0) {
-    message("[D] raw schedule[[1]]$home keys: ",
-            paste(names(schedule[[1]]$home), collapse=", "))
+    message("[D] raw schedule[[1]] matchupPeriodId=", schedule[[1]]$matchupPeriodId,
+            "  home keys: ", paste(names(schedule[[1]]$home), collapse=", "))
+    # Find all entries that have rosterForMatchupPeriod
+    has_rfmp <- purrr::map_lgl(schedule, ~!is.null(.x$home$rosterForMatchupPeriod))
+    msg_ids  <- purrr::map_int(schedule[has_rfmp], ~.x$matchupPeriodId)
+    message("[D] matchupPeriodIds with rosterForMatchupPeriod: ",
+            paste(unique(msg_ids), collapse=", "))
   }
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
