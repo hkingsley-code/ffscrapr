@@ -231,6 +231,24 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (nrow(team_entries) == 0) return(tibble::tibble())
 
+  # Debug: inspect first playerPoolEntry to find where weekly score lives
+  if (nrow(team_entries) > 0) {
+    first_pd <- team_entries$player_data[[1]]
+    message("[debug] playerPoolEntry fields: ", paste(names(first_pd), collapse=", "))
+    message("[debug] appliedStatTotal: ", first_pd$appliedStatTotal)
+    if (!is.null(first_pd$stats) && length(first_pd$stats) > 0) {
+      message("[debug] stats entries: ", length(first_pd$stats))
+      for (i in seq_along(first_pd$stats)) {
+        s <- first_pd$stats[[i]]
+        message("  [", i, "] scoringPeriodId=", s$scoringPeriodId,
+                " statSourceId=", s$statSourceId,
+                " appliedTotal=", s$appliedTotal)
+      }
+    } else {
+      message("[debug] no stats array found")
+    }
+  }
+
   team_entries <- team_entries %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
     dplyr::select(-"player_data") %>%
