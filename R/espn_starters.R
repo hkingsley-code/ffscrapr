@@ -86,7 +86,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   checkmax <- .espn_week_checkmax(conn)
   max_week        <- checkmax$max_week
-  matchup_periods <- checkmax$matchup_periods
+  matchup_last_day <- checkmax$matchup_last_day
 
   run_weeks <- weeks[weeks <= max_week]
 
@@ -102,7 +102,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     return(NULL)
   }
 
-  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_periods))
+  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_last_day))
 
   if (nrow(raw_starters) == 0) return(NULL)
 
@@ -136,126 +136,87 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 }
 
 .espn_week_checkmax <- function(conn) {
+  # Include mMatchupScore so we can read pointsByScoringPeriod from the schedule.
+  # pointsByScoringPeriod keys are the actual DAILY scoring period IDs in each
+  # matchup week — the only reliable way to map matchup week → daily period range.
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
-    "?scoringPeriodId=0&view=mSettings"
+    "?scoringPeriodId=1&view=mSettings&view=mMatchupScore"
   )
 
-  settings <- espn_getendpoint_raw(conn, url_query)
+  content <- espn_getendpoint_raw(conn, url_query) %>%
+    purrr::pluck("content")
 
-  current_scoring_period <- settings %>%
-    purrr::pluck("content", "status", "latestScoringPeriod")
+  current_scoring_period <- purrr::pluck(content, "status", "latestScoringPeriod")
+  final_scoring_period   <- purrr::pluck(content, "status", "finalScoringPeriod")
+  max_scoring_period     <- min(current_scoring_period, final_scoring_period, na.rm = TRUE)
 
-  final_scoring_period <- settings %>%
-    purrr::pluck("content", "status", "finalScoringPeriod")
+  # Build matchupPeriod → last daily scoring period from schedule entries.
+  # Each schedule entry's home$pointsByScoringPeriod has daily period IDs as names.
+  schedule <- purrr::pluck(content, "schedule")
 
-  # matchupPeriods: named list, keys are matchupPeriodId (as character),
-  # values are integer vectors of scoringPeriodIds in that matchup week.
-  # e.g. list("1" = 1:7, "2" = 8:14, ...)
-  matchup_periods <- settings %>%
-    purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriods")
+  matchup_last_day <- purrr::map_dfr(schedule, function(entry) {
+    pbs <- entry$home$pointsByScoringPeriod
+    if (!is.null(pbs) && length(pbs) > 0) {
+      days <- suppressWarnings(as.integer(names(pbs)))
+      days <- days[!is.na(days)]
+      if (length(days) > 0) {
+        return(tibble::tibble(matchup = as.integer(entry$matchupPeriodId),
+                              last_day = max(days),
+                              first_day = min(days)))
+      }
+    }
+    tibble::tibble(matchup = integer(0L), last_day = integer(0L), first_day = integer(0L))
+  }) %>%
+    dplyr::group_by(.data$matchup) %>%
+    dplyr::summarise(last_day  = max(.data$last_day),
+                     first_day = min(.data$first_day),
+                     .groups = "drop")
 
-  max_scoring_period <- min(current_scoring_period, final_scoring_period, na.rm = TRUE)
+  # Max available week: last matchup whose first day has already occurred.
+  started <- matchup_last_day$matchup[matchup_last_day$first_day <= max_scoring_period]
+  max_week <- if (length(started) > 0) max(started) else 0L
 
-  if (!is.null(matchup_periods) && length(matchup_periods) > 0) {
-    last_scoring_per_matchup <- purrr::map_int(matchup_periods, ~max(as.integer(.x)))
-    completed_weeks <- which(last_scoring_per_matchup <= max_scoring_period)
-    max_week <- if (length(completed_weeks) > 0) max(completed_weeks) else 0L
-  } else {
-    matchup_period_length <- settings %>%
-      purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriodLength", .default = 1L)
-    max_week <- floor(max_scoring_period / matchup_period_length)
-  }
+  # Named vector: matchupPeriodId → last daily scoring period (capped at max_scoring_period)
+  last_day_vec <- pmin(matchup_last_day$last_day, max_scoring_period)
+  names(last_day_vec) <- as.character(matchup_last_day$matchup)
 
-  list(max_week = max_week, matchup_periods = matchup_periods)
+  list(max_week = max_week, matchup_last_day = last_day_vec)
 }
 
-.espn_week_starter <- function(week, conn, matchup_periods = NULL) {
-  if (!is.null(matchup_periods) && !is.null(matchup_periods[[as.character(week)]])) {
-    scoring_period_id <- max(as.integer(matchup_periods[[as.character(week)]]))
+.espn_week_starter <- function(week, conn, matchup_last_day = NULL) {
+  # Use the last daily scoring period of the target matchup week.
+  # Querying with the last day of the week causes the API to populate
+  # rosterForMatchupPeriod (weekly cumulative stats) for that week's entries.
+  scoring_period_id <- if (!is.null(matchup_last_day[[as.character(week)]])) {
+    matchup_last_day[[as.character(week)]]
   } else {
-    scoring_period_id <- week
+    week
   }
 
-  # mBoxscore view adds rosterForMatchupPeriod (weekly cumulative stats) and
-  # rosterForCurrentScoringPeriod to each schedule home/away entry.
-  # rosterForMatchupPeriod has the correct per-player totals for the full week.
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
     "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore&view=mRoster"
   )
 
-  message("[D] url: ", url_query)
-  raw_content <- espn_getendpoint_raw(conn, url_query)
-  schedule <- purrr::pluck(raw_content, "content", "schedule")
-
-  if (!is.null(schedule) && length(schedule) > 0) {
-    # Which matchup weeks have rosterForMatchupPeriod?
-    has_rfmp <- purrr::map_lgl(schedule, ~!is.null(.x$home$rosterForMatchupPeriod))
-    rfmp_weeks <- purrr::map_int(schedule[has_rfmp], ~.x$matchupPeriodId)
-    message("[D] matchupPeriodIds with rosterForMatchupPeriod: ",
-            paste(unique(rfmp_weeks), collapse=", "))
-
-    # Find a week-2 entry and show its pointsByScoringPeriod keys
-    week2_entries <- purrr::keep(schedule, ~isTRUE(.x$matchupPeriodId == 2))
-    if (length(week2_entries) > 0) {
-      pbs <- week2_entries[[1]]$home$pointsByScoringPeriod
-      message("[D] week-2 pointsByScoringPeriod keys (daily scoring periods): ",
-              paste(names(pbs), collapse=", "))
-    }
-
-    # Show raw matchupPeriods for first 3 entries
-    mp <- purrr::pluck(raw_content, "content", "settings", "scheduleSettings", "matchupPeriods")
-    if (!is.null(mp)) {
-      for (i in seq_len(min(3, length(mp)))) {
-        message("[D] matchupPeriods[[", i, "]]: ", paste(as.integer(mp[[i]]), collapse=", "))
-      }
-    }
-  }
+  schedule <- espn_getendpoint_raw(conn, url_query) %>%
+    purrr::pluck("content", "schedule")
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
 
-  tbl <- tibble::tibble(x = schedule) %>%
+  raw <- tibble::tibble(x = schedule) %>%
     tidyr::hoist("x", "week" = "matchupPeriodId", "home", "away") %>%
-    dplyr::filter(.data$week == .env$week)
-  message("[D] rows for week=", week, ": ", nrow(tbl))
-
-  pivoted <- tidyr::pivot_longer(tbl, c(.data$home, .data$away),
-                                  names_to = NULL, values_to = "team")
-  list_teams <- dplyr::filter(pivoted, purrr::map_lgl(.data$team, is.list))
-  message("[D] rows after is.list(team): ", nrow(list_teams))
-
-  if (nrow(list_teams) > 0) {
-    t1 <- list_teams$team[[1]]
-    message("[D] team keys: ", paste(names(t1), collapse=", "))
-    rfmp <- t1$rosterForMatchupPeriod
-    message("[D] rosterForMatchupPeriod type: ", class(rfmp)[1],
-            " is.list: ", is.list(rfmp))
-    if (is.list(rfmp)) {
-      message("[D] rosterForMatchupPeriod keys: ", paste(names(rfmp), collapse=", "))
-      entries_mp <- rfmp$entries
-      if (!is.null(entries_mp) && length(entries_mp) > 0) {
-        e1 <- entries_mp[[1]]
-        message("[D] rosterForMatchupPeriod first entry keys: ", paste(names(e1), collapse=", "))
-        ppe_mp <- e1$playerPoolEntry
-        if (!is.null(ppe_mp)) {
-          message("[D] rosterForMatchupPeriod ppe keys: ", paste(names(ppe_mp), collapse=", "))
-          message("[D] rosterForMatchupPeriod ppe appliedStatTotal: ", ppe_mp$appliedStatTotal)
-        }
-      }
-    }
-  }
-
-  raw <- list_teams %>%
+    dplyr::filter(.data$week == .env$week) %>%
+    tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
+    dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
     tidyr::hoist("team",
                  "franchise_id"    = "teamId",
                  "franchise_score" = "totalPoints",
                  "starting_lineup" = "rosterForMatchupPeriod") %>%
     dplyr::select(-"team", -"x") %>%
     dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list))
-  message("[D] rows after is.list(starting_lineup): ", nrow(raw))
 
   if (nrow(raw) == 0) return(tibble::tibble())
 
