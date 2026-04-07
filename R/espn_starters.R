@@ -189,27 +189,41 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   content <- espn_getendpoint_raw(conn, url_query) %>%
     purrr::pluck("content")
 
-  # Debug: show top-level content keys and first team object keys
-  message("[debug] content keys: ", paste(names(content), collapse=", "))
-  teams_debug <- purrr::pluck(content, "teams")
-  if (!is.null(teams_debug) && length(teams_debug) > 0) {
-    message("[debug] first team keys: ", paste(names(teams_debug[[1]]), collapse=", "))
-    roster_debug <- teams_debug[[1]]$roster
-    if (!is.null(roster_debug)) {
-      message("[debug] first team roster keys: ", paste(names(roster_debug), collapse=", "))
-      entries_debug <- roster_debug$entries
-      if (!is.null(entries_debug) && length(entries_debug) > 0) {
-        message("[debug] first entry keys: ", paste(names(entries_debug[[1]]), collapse=", "))
-        ppe <- entries_debug[[1]]$playerPoolEntry
-        if (!is.null(ppe)) {
-          message("[debug] playerPoolEntry keys: ", paste(names(ppe), collapse=", "))
-          if (!is.null(ppe$stats)) message("[debug] stats length: ", length(ppe$stats))
+  # Debug: inspect schedule entry for rosterForCurrentScoringPeriod and cumulativeScore
+  sched_debug <- purrr::pluck(content, "schedule")
+  if (!is.null(sched_debug) && length(sched_debug) > 0) {
+    first_entry <- sched_debug[[1]]
+    message("[debug] first schedule entry keys: ", paste(names(first_entry), collapse=", "))
+    home_debug <- first_entry$home
+    if (!is.null(home_debug)) {
+      message("[debug] schedule home keys: ", paste(names(home_debug), collapse=", "))
+      rfcsp <- home_debug$rosterForCurrentScoringPeriod
+      if (!is.null(rfcsp)) {
+        message("[debug] rosterForCurrentScoringPeriod keys: ", paste(names(rfcsp), collapse=", "))
+        entries_rfcsp <- rfcsp$entries
+        if (!is.null(entries_rfcsp) && length(entries_rfcsp) > 0) {
+          message("[debug] rosterForCurrentScoringPeriod first entry keys: ",
+                  paste(names(entries_rfcsp[[1]]), collapse=", "))
+          ppe2 <- entries_rfcsp[[1]]$playerPoolEntry
+          if (!is.null(ppe2)) {
+            message("[debug] schedule ppe keys: ", paste(names(ppe2), collapse=", "))
+            message("[debug] schedule ppe appliedStatTotal: ", ppe2$appliedStatTotal)
+            if (!is.null(ppe2$stats)) {
+              message("[debug] schedule ppe stats length: ", length(ppe2$stats))
+              if (length(ppe2$stats) > 0) {
+                s1 <- ppe2$stats[[1]]
+                message("[debug] first stat: scoringPeriodId=", s1$scoringPeriodId,
+                        " statSourceId=", s1$statSourceId,
+                        " appliedTotal=", s1$appliedTotal)
+              }
+            }
+          }
         }
+      } else {
+        message("[debug] NO rosterForCurrentScoringPeriod in schedule home")
       }
-    }
-    rfscp <- teams_debug[[1]]$rosterForCurrentScoringPeriod
-    if (!is.null(rfscp)) {
-      message("[debug] team has rosterForCurrentScoringPeriod: TRUE, keys: ", paste(names(rfscp), collapse=", "))
+      cs <- home_debug$cumulativeScore
+      message("[debug] cumulativeScore keys: ", paste(names(cs), collapse=", "))
     }
   }
 
