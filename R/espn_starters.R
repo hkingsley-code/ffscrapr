@@ -187,8 +187,15 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore&view=mRoster"
   )
 
-  schedule <- espn_getendpoint_raw(conn, url_query) %>%
-    purrr::pluck("content", "schedule")
+  message("[D] url: ", url_query)
+  raw_content <- espn_getendpoint_raw(conn, url_query)
+  schedule <- purrr::pluck(raw_content, "content", "schedule")
+
+  # Print schedule home keys directly from raw response (before any transformation)
+  if (!is.null(schedule) && length(schedule) > 0) {
+    message("[D] raw schedule[[1]]$home keys: ",
+            paste(names(schedule[[1]]$home), collapse=", "))
+  }
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
 
