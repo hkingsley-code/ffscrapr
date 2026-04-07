@@ -184,7 +184,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
-    "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore"
+    "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore&view=mRoster"
   )
 
   schedule <- espn_getendpoint_raw(conn, url_query) %>%
@@ -208,8 +208,19 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     rfmp <- t1$rosterForMatchupPeriod
     message("[D] rosterForMatchupPeriod type: ", class(rfmp)[1],
             " is.list: ", is.list(rfmp))
-    if (is.list(rfmp)) message("[D] rosterForMatchupPeriod keys: ",
-                               paste(names(rfmp), collapse=", "))
+    if (is.list(rfmp)) {
+      message("[D] rosterForMatchupPeriod keys: ", paste(names(rfmp), collapse=", "))
+      entries_mp <- rfmp$entries
+      if (!is.null(entries_mp) && length(entries_mp) > 0) {
+        e1 <- entries_mp[[1]]
+        message("[D] rosterForMatchupPeriod first entry keys: ", paste(names(e1), collapse=", "))
+        ppe_mp <- e1$playerPoolEntry
+        if (!is.null(ppe_mp)) {
+          message("[D] rosterForMatchupPeriod ppe keys: ", paste(names(ppe_mp), collapse=", "))
+          message("[D] rosterForMatchupPeriod ppe appliedStatTotal: ", ppe_mp$appliedStatTotal)
+        }
+      }
+    }
   }
 
   raw <- list_teams %>%
