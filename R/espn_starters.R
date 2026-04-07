@@ -85,8 +85,8 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   checkmate::assert_numeric(weeks)
 
   checkmax <- .espn_week_checkmax(conn)
-  max_week              <- checkmax$max_week
-  matchup_period_length <- checkmax$matchup_period_length
+  max_week        <- checkmax$max_week
+  matchup_periods <- checkmax$matchup_periods
 
   run_weeks <- weeks[weeks <= max_week]
 
@@ -102,7 +102,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     return(NULL)
   }
 
-  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_period_length))
+  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_periods))
 
   if (nrow(raw_starters) == 0) return(NULL)
 
@@ -144,23 +144,42 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   settings <- espn_getendpoint_raw(conn, url_query)
 
-  current_week <- settings %>%
+  current_scoring_period <- settings %>%
     purrr::pluck("content", "status", "latestScoringPeriod")
 
-  final_week <- settings %>%
+  final_scoring_period <- settings %>%
     purrr::pluck("content", "status", "finalScoringPeriod")
 
-  matchup_period_length <- settings %>%
-    purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriodLength", .default = 1L)
+  # matchupPeriods: named list, keys are matchupPeriodId (as character),
+  # values are integer vectors of scoringPeriodIds in that matchup week.
+  # e.g. list("1" = 1:7, "2" = 8:14, ...)
+  matchup_periods <- settings %>%
+    purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriods")
 
-  max_scoring_period <- min(current_week, final_week, na.rm = TRUE)
-  max_matchup_period <- floor(max_scoring_period / matchup_period_length)
+  max_scoring_period <- min(current_scoring_period, final_scoring_period, na.rm = TRUE)
 
-  list(max_week = max_matchup_period, matchup_period_length = matchup_period_length)
+  if (!is.null(matchup_periods) && length(matchup_periods) > 0) {
+    # Find the last matchup week whose scoring periods have all started
+    last_scoring_per_matchup <- purrr::map_int(matchup_periods, ~max(as.integer(.x)))
+    completed_weeks <- which(last_scoring_per_matchup <= max_scoring_period)
+    max_week <- if (length(completed_weeks) > 0) max(completed_weeks) else 0L
+  } else {
+    # Fallback: use matchupPeriodLength if matchupPeriods is unavailable
+    matchup_period_length <- settings %>%
+      purrr::pluck("content", "settings", "scheduleSettings", "matchupPeriodLength", .default = 1L)
+    max_week <- floor(max_scoring_period / matchup_period_length)
+  }
+
+  list(max_week = max_week, matchup_periods = matchup_periods)
 }
 
-.espn_week_starter <- function(week, conn, matchup_period_length = 1L) {
-  scoring_period_id <- week * matchup_period_length
+.espn_week_starter <- function(week, conn, matchup_periods = NULL) {
+  if (!is.null(matchup_periods) && !is.null(matchup_periods[[as.character(week)]])) {
+    scoring_period_id <- max(as.integer(matchup_periods[[as.character(week)]]))
+  } else {
+    # Fallback: assume scoring period == week (1:1 mapping)
+    scoring_period_id <- week
+  }
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
