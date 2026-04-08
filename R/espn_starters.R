@@ -106,6 +106,11 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (nrow(raw_starters) == 0) return(NULL)
 
+  message("[D] unique lineup_ids: ",
+          paste(sort(unique(raw_starters$lineup_id)), collapse=", "))
+  message("[D] sample: lineup_id=", raw_starters$lineup_id[1],
+          " player_id=", raw_starters$player_id[1])
+
   starters <- raw_starters %>%
     dplyr::mutate(
       lineup_slot = .espn_lineupslot_map()[as.character(.data$lineup_id)] %>% unname(),
