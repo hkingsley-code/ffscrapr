@@ -15,10 +15,12 @@
 #' \enumerate{
 #'   \item \code{franchise_name} already present in \code{schedule}
 #'     (Fleaflicker includes this automatically).
-#'   \item \code{franchises} tibble supplied by the caller (output of
-#'     \code{\link{ff_franchises}}), joined on \code{franchise_id}.
-#'   \item \code{franchise_id} used as a fallback when neither source is
-#'     available.
+#'   \item \code{conn} supplied — \code{\link{ff_franchises}} is called
+#'     internally to look up names.
+#'   \item \code{franchises} tibble supplied directly (output of
+#'     \code{\link{ff_franchises}}).
+#'   \item \code{franchise_id} used as a fallback when none of the above
+#'     are available.
 #' }
 #'
 #' @param schedule A tibble returned by \code{\link{ff_schedule}}, containing
@@ -26,10 +28,12 @@
 #'   \code{franchise_score}. Weeks with \code{NA} scores (unplayed games) are
 #'   automatically excluded from elimination consideration.
 #' @param week Integer. The scoring week number to evaluate.
+#' @param conn Optional. A connection object created by \code{\link{ff_connect}}
+#'   (or a platform-specific connect function). When supplied, franchise names
+#'   are fetched automatically via \code{\link{ff_franchises}}.
 #' @param franchises Optional. A tibble returned by \code{\link{ff_franchises}},
-#'   used to look up \code{franchise_name} for platforms whose schedule does not
-#'   include team names (ESPN, MFL, Sleeper). Ignored if \code{schedule} already
-#'   contains a \code{franchise_name} column.
+#'   used to look up \code{franchise_name}. Ignored if \code{conn} is supplied
+#'   or if \code{schedule} already contains a \code{franchise_name} column.
 #'
 #' @return If teams remain to be eliminated in \code{week}: a named list with
 #'   \describe{
@@ -45,20 +49,32 @@
 #' @examples
 #' \donttest{
 #' try({
-#'   conn      <- ff_connect(platform = "espn", league_id = 12345, season = 2023)
-#'   sched     <- ff_schedule(conn)
-#'   franchises <- ff_franchises(conn)
-#'   get_survivor(sched, week = 3, franchises = franchises)
+#'   conn  <- ff_connect(platform = "espn", league_id = 12345, season = 2023)
+#'   sched <- ff_schedule(conn)
+#'
+#'   # Simplest — pass conn and names are fetched automatically
+#'   get_survivor(sched, week = 3, conn = conn)
 #' })
 #' }
 #'
 #' @export
-get_survivor <- function(schedule, week, franchises = NULL) {
-  # Join franchise_name if not already in schedule and franchises tibble provided
+get_survivor <- function(schedule, week, conn = NULL, franchises = NULL) {
+  # Normalise franchise_id to character so joins work regardless of platform
+  # (ESPN returns integer from map_int; other platforms may return double or character)
+  schedule <- dplyr::mutate(schedule, franchise_id = as.character(.data$franchise_id))
+
+  # Fetch franchise names from connection if provided
+  if (!is.null(conn) && !"franchise_name" %in% names(schedule)) {
+    franchises <- ff_franchises(conn)
+  }
+
+  # Join franchise_name if not already in schedule
   if (!"franchise_name" %in% names(schedule) && !is.null(franchises)) {
     schedule <- schedule %>%
       dplyr::left_join(
-        dplyr::select(franchises, "franchise_id", "franchise_name"),
+        franchises %>%
+          dplyr::select("franchise_id", "franchise_name") %>%
+          dplyr::mutate(franchise_id = as.character(.data$franchise_id)),
         by = "franchise_id"
       )
   }
