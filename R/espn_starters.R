@@ -85,8 +85,8 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   checkmate::assert_numeric(weeks)
 
   checkmax <- .espn_week_checkmax(conn)
-  max_week        <- checkmax$max_week
-  matchup_last_day <- checkmax$matchup_last_day
+  max_week     <- checkmax$max_week
+  matchup_days <- checkmax$matchup_days
 
   run_weeks <- weeks[weeks <= max_week]
 
@@ -102,7 +102,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     return(NULL)
   }
 
-  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_last_day))
+  raw_starters <- purrr::map_dfr(run_weeks, ~.espn_week_starter(.x, conn, matchup_days))
 
   if (nrow(raw_starters) == 0) return(NULL)
 
@@ -152,50 +152,53 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   final_scoring_period   <- purrr::pluck(content, "status", "finalScoringPeriod")
   max_scoring_period     <- min(current_scoring_period, final_scoring_period, na.rm = TRUE)
 
-  # Build matchupPeriod → last daily scoring period from schedule entries.
+  # Build matchupPeriod → all daily scoring period IDs from schedule entries.
   # Each schedule entry's home$pointsByScoringPeriod has daily period IDs as names.
   schedule <- purrr::pluck(content, "schedule")
 
-  matchup_last_day <- purrr::map_dfr(schedule, function(entry) {
+  # Collect all unique daily period IDs per matchup week
+  matchup_days_raw <- purrr::map_dfr(schedule, function(entry) {
     pbs <- entry$home$pointsByScoringPeriod
     if (!is.null(pbs) && length(pbs) > 0) {
       days <- suppressWarnings(as.integer(names(pbs)))
       days <- days[!is.na(days)]
       if (length(days) > 0) {
-        return(tibble::tibble(matchup = as.integer(entry$matchupPeriodId),
-                              last_day = max(days),
-                              first_day = min(days)))
+        return(tibble::tibble(
+          matchup = as.integer(entry$matchupPeriodId),
+          day     = days
+        ))
       }
     }
-    tibble::tibble(matchup = integer(0L), last_day = integer(0L), first_day = integer(0L))
+    tibble::tibble(matchup = integer(0L), day = integer(0L))
   }) %>%
+    dplyr::distinct() %>%
     dplyr::group_by(.data$matchup) %>%
-    dplyr::summarise(last_day  = max(.data$last_day),
-                     first_day = min(.data$first_day),
-                     .groups = "drop")
+    dplyr::summarise(
+      days      = list(sort(unique(.data$day))),
+      first_day = min(.data$day),
+      last_day  = max(.data$day),
+      .groups   = "drop"
+    )
 
   # Max available week: last matchup whose first day has already occurred.
-  started <- matchup_last_day$matchup[matchup_last_day$first_day <= max_scoring_period]
+  started  <- matchup_days_raw$matchup[matchup_days_raw$first_day <= max_scoring_period]
   max_week <- if (length(started) > 0) max(started) else 0L
 
-  # Named vector: matchupPeriodId → last daily scoring period (capped at max_scoring_period)
-  last_day_vec <- pmin(matchup_last_day$last_day, max_scoring_period)
-  names(last_day_vec) <- as.character(matchup_last_day$matchup)
+  # Named list: matchupPeriodId → integer vector of daily scoring period IDs
+  # Cap each day at max_scoring_period so we don't query future days.
+  matchup_days <- purrr::map(matchup_days_raw$days, function(d) {
+    d[d <= max_scoring_period]
+  })
+  names(matchup_days) <- as.character(matchup_days_raw$matchup)
 
-  list(max_week = max_week, matchup_last_day = last_day_vec)
+  list(max_week = max_week, matchup_days = matchup_days)
 }
 
-.espn_week_starter <- function(week, conn, matchup_last_day = NULL) {
-  scoring_period_id <- if (!is.null(matchup_last_day[[as.character(week)]])) {
-    matchup_last_day[[as.character(week)]]
-  } else {
-    week
-  }
-
+.espn_day_roster <- function(day, week, conn) {
   url_query <- glue::glue(
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{conn$season}/segments/0/leagues/{conn$league_id}",
-    "?scoringPeriodId={scoring_period_id}&view=mMatchupScore&view=mBoxscore&view=mRoster"
+    "?scoringPeriodId={day}&view=mMatchupScore&view=mBoxscore&view=mRoster"
   )
 
   schedule <- espn_getendpoint_raw(conn, url_query) %>%
@@ -203,7 +206,7 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
 
-  # Filter schedule to just the target week and pivot home/away into rows
+  # Filter schedule to just the target week, pivot home/away into rows
   week_teams <- tibble::tibble(x = schedule) %>%
     tidyr::hoist("x", "week" = "matchupPeriodId", "home", "away") %>%
     dplyr::filter(.data$week == .env$week) %>%
@@ -212,22 +215,24 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     tidyr::hoist("team",
                  "franchise_id"    = "teamId",
                  "franchise_score" = "totalPoints",
-                 "slot_roster"     = "rosterForCurrentScoringPeriod",
-                 "score_roster"    = "rosterForMatchupPeriod") %>%
+                 "slot_roster"     = "rosterForCurrentScoringPeriod") %>%
     dplyr::select(-"team", -"x") %>%
-    dplyr::filter(purrr::map_lgl(.data$score_roster, is.list))
+    dplyr::filter(purrr::map_lgl(.data$slot_roster, is.list))
 
   if (nrow(week_teams) == 0) return(tibble::tibble())
 
-  # --- Weekly scores from rosterForMatchupPeriod (correct cumulative totals) ---
-  scores <- week_teams %>%
-    dplyr::select("franchise_id", "franchise_score", "score_roster") %>%
-    tidyr::hoist("score_roster", "score_entries" = "entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$score_entries, is.list)) %>%
-    tidyr::unnest_longer("score_entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$score_entries, is.list)) %>%
-    tidyr::hoist("score_entries",
+  # Extract per-player slot and daily appliedStatTotal from rosterForCurrentScoringPeriod.
+  # This roster field correctly reflects the lineup slot for THIS day, and
+  # appliedStatTotal here is the stats accumulated during this scoring period.
+  week_teams %>%
+    dplyr::select("franchise_id", "franchise_score", "slot_roster") %>%
+    tidyr::hoist("slot_roster", "entries" = "entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
+    tidyr::unnest_longer("entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
+    tidyr::hoist("entries",
                  "player_id"   = "playerId",
+                 "lineup_id"   = "lineupSlotId",
                  "player_data" = "playerPoolEntry") %>%
     dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
@@ -238,23 +243,43 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
                  "player_name"           = "fullName",
                  "pos"                   = "defaultPositionId",
                  "team"                  = "proTeamId") %>%
-    dplyr::select(-"player")
+    dplyr::select(-"player") %>%
+    dplyr::mutate(scoring_day = .env$day)
+}
 
-  if (nrow(scores) == 0) return(tibble::tibble())
+.espn_week_starter <- function(week, conn, matchup_days = NULL) {
+  week_days <- if (!is.null(matchup_days[[as.character(week)]])) {
+    matchup_days[[as.character(week)]]
+  } else {
+    week
+  }
 
-  # --- Lineup slots from rosterForCurrentScoringPeriod (has real lineupSlotId) ---
-  slots <- week_teams %>%
-    dplyr::select("franchise_id", "slot_roster") %>%
-    dplyr::filter(purrr::map_lgl(.data$slot_roster, is.list)) %>%
-    tidyr::hoist("slot_roster", "slot_entries" = "entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$slot_entries, is.list)) %>%
-    tidyr::unnest_longer("slot_entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$slot_entries, is.list)) %>%
-    tidyr::hoist("slot_entries", "player_id" = "playerId", "lineup_id" = "lineupSlotId") %>%
-    dplyr::select("franchise_id", "player_id", "lineup_id")
+  # Query each day in the matchup week individually.
+  # rosterForCurrentScoringPeriod gives us the correct slot for that day
+  # and the points scored during that day.
+  daily_rosters <- purrr::map_dfr(week_days, .espn_day_roster, week = week, conn = conn)
 
-  # Join lineup slots onto scores
-  scores %>%
-    dplyr::left_join(slots, by = c("franchise_id", "player_id")) %>%
+  if (nrow(daily_rosters) == 0) return(tibble::tibble())
+
+  # franchise_score should come from the LAST queried day (most up-to-date total)
+  franchise_scores <- daily_rosters %>%
+    dplyr::filter(.data$scoring_day == max(.data$scoring_day)) %>%
+    dplyr::distinct(.data$franchise_id, .data$franchise_score)
+
+  # Sum each player's points within each slot they occupied across all days.
+  # A player who pitches as SP on day 1 and sits on bench day 2-7 will have
+  # their SP day summed, giving correct slot attribution.
+  daily_rosters %>%
+    dplyr::group_by(
+      .data$franchise_id,
+      .data$player_id,
+      .data$lineup_id,
+      .data$player_name,
+      .data$pos,
+      .data$team,
+      .data$eligible_lineup_slots
+    ) %>%
+    dplyr::summarise(player_score = sum(.data$player_score, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::left_join(franchise_scores, by = "franchise_id") %>%
     dplyr::mutate(week = .env$week)
 }
