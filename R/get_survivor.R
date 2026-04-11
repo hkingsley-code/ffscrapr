@@ -11,18 +11,6 @@
 #' cumulatively tracking eliminated teams. In each week, only teams not yet
 #' eliminated compete, and the lowest-scoring team among them is eliminated.
 #'
-#' Team names are resolved in this priority order:
-#' \enumerate{
-#'   \item \code{franchise_name} already present in \code{schedule}
-#'     (Fleaflicker includes this automatically).
-#'   \item \code{conn} supplied — \code{\link{ff_franchises}} is called
-#'     internally to look up names.
-#'   \item \code{franchises} tibble supplied directly (output of
-#'     \code{\link{ff_franchises}}).
-#'   \item \code{franchise_id} used as a fallback when none of the above
-#'     are available.
-#' }
-#'
 #' @param schedule A tibble returned by \code{\link{ff_schedule}}, containing
 #'   at minimum the columns \code{week}, \code{franchise_id}, and
 #'   \code{franchise_score}. Weeks with \code{NA} scores (unplayed games) are
@@ -30,18 +18,18 @@
 #' @param week Integer. The scoring week number to evaluate.
 #' @param conn Optional. A connection object created by \code{\link{ff_connect}}
 #'   (or a platform-specific connect function). When supplied, franchise names
-#'   are fetched automatically via \code{\link{ff_franchises}}.
+#'   are fetched automatically via \code{\link{ff_franchises}}. Recommended for
+#'   ESPN, MFL, and Sleeper where the schedule does not include team names.
 #' @param franchises Optional. A tibble returned by \code{\link{ff_franchises}},
-#'   used to look up \code{franchise_name}. Ignored if \code{conn} is supplied
-#'   or if \code{schedule} already contains a \code{franchise_name} column.
+#'   as an alternative to supplying \code{conn}. Ignored if \code{conn} is
+#'   provided or if \code{schedule} already contains \code{franchise_name}.
 #'
 #' @return If teams remain to be eliminated in \code{week}: a named list with
 #'   \describe{
-#'     \item{loser}{A one-row tibble with \code{franchise_name} (or
-#'       \code{franchise_id} if names are unavailable) and
+#'     \item{loser}{A one-row tibble with \code{franchise_name} and
 #'       \code{franchise_score} of the team eliminated in \code{week}.}
-#'     \item{survivors}{A tibble of team names (or IDs) for all teams still
-#'       alive after \code{week}.}
+#'     \item{survivors}{A tibble of \code{franchise_name} values for all teams
+#'       still alive after \code{week}.}
 #'   }
 #'   If no teams are left to compete in any week (all have previously been
 #'   eliminated): the string \code{"all teams have been eliminated"}.
@@ -51,8 +39,6 @@
 #' try({
 #'   conn  <- ff_connect(platform = "espn", league_id = 12345, season = 2023)
 #'   sched <- ff_schedule(conn)
-#'
-#'   # Simplest — pass conn and names are fetched automatically
 #'   get_survivor(sched, week = 3, conn = conn)
 #' })
 #' }
@@ -79,7 +65,16 @@ get_survivor <- function(schedule, week, conn = NULL, franchises = NULL) {
       )
   }
 
-  has_name <- "franchise_name" %in% names(schedule)
+  # Always ensure franchise_name column exists — fall back to franchise_id value
+  # so the output column is consistent regardless of platform or arguments passed
+  if (!"franchise_name" %in% names(schedule)) {
+    message(
+      "No franchise names available. ",
+      "Pass `conn` or `franchises = ff_franchises(conn)` to include team names. ",
+      "Falling back to franchise_id."
+    )
+    schedule <- dplyr::mutate(schedule, franchise_name = .data$franchise_id)
+  }
 
   eliminated_ids <- character(0)
   all_ids        <- unique(schedule$franchise_id)
@@ -104,24 +99,19 @@ get_survivor <- function(schedule, week, conn = NULL, franchises = NULL) {
     eliminated_ids <- c(eliminated_ids, loser_row$franchise_id)
   }
 
-  # Build loser output — prefer name over id
+  # Build loser output
   loser_out <- loser_row %>%
-    dplyr::select(dplyr::any_of(c("franchise_name", "franchise_id", "franchise_score"))) %>%
-    dplyr::select(-dplyr::any_of(if (has_name) "franchise_id" else character(0)))
+    dplyr::select("franchise_name", "franchise_score")
 
   # Build survivors
   survivor_ids <- setdiff(all_ids, eliminated_ids)
 
-  if (has_name) {
-    name_lookup <- schedule %>%
-      dplyr::distinct(.data$franchise_id, .data$franchise_name)
+  name_lookup <- schedule %>%
+    dplyr::distinct(.data$franchise_id, .data$franchise_name)
 
-    survivors <- tibble::tibble(franchise_id = survivor_ids) %>%
-      dplyr::left_join(name_lookup, by = "franchise_id") %>%
-      dplyr::select("franchise_name")
-  } else {
-    survivors <- tibble::tibble(franchise_id = survivor_ids)
-  }
+  survivors <- tibble::tibble(franchise_id = survivor_ids) %>%
+    dplyr::left_join(name_lookup, by = "franchise_id") %>%
+    dplyr::select("franchise_name")
 
   list(loser = loser_out, survivors = survivors)
 }
