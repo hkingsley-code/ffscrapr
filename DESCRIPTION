@@ -15,18 +15,15 @@ Authors@R:
              family = "Sydlowski",
              role = "ctb",
              email = "syd235@gmail.com"))
-Description: Helps access various Fantasy Football APIs by handling
+Description: Helps access various Fantasy Baseball APIs by handling
     authentication and rate-limiting, forming appropriate calls, and
     returning tidy dataframes which can be easily connected to other data
     sources.
 License: MIT + file LICENSE
 URL: https://ffscrapr.ffverse.com,
     https://github.com/ffverse/ffscrapr,
-    https://api.myfantasyleague.com/2020/api_info,
-    https://docs.sleeper.app,
     https://www.fleaflicker.com/api-docs/index.html,
-    https://www.espn.com/fantasy/,
-    https://www.nflfastr.com/reference/load_player_stats.html
+    https://www.espn.com/fantasy/
 BugReports: https://github.com/ffverse/ffscrapr/issues
 Depends:
     R (>= 3.6.0)
@@ -39,7 +36,6 @@ Imports:
     jsonlite (>= 1.6.0),
     lifecycle,
     magrittr (>= 1.5.0),
-    nflreadr (>= 1.1.0),
     memoise (>= 2.0.0),
     purrr (>= 0.3.0),
     rappdirs (>= 0.3.0),
@@ -49,6 +45,7 @@ Imports:
     tibble (>= 3.0.0),
     tidyr (>= 1.0.0)
 Suggests:
+    baseballr (>= 0.9.0),
     covr (>= 3.0.0),
     curl (>= 4.0.0),
     httptest (>= 3.0.0),

@@ -16,7 +16,7 @@
 #'
 #' @export
 ff_league.flea_conn <- function(conn) {
-  league_endpoint <- fleaflicker_getendpoint("FetchLeagueStandings", league_id = conn$league_id, sport = "NFL", season = conn$season) %>%
+  league_endpoint <- fleaflicker_getendpoint("FetchLeagueStandings", league_id = conn$league_id, sport = "MLB", season = conn$season) %>%
     purrr::pluck("content")
 
   tibble::tibble(

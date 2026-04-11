@@ -1,6 +1,6 @@
 #' Sleeper players library
 #'
-#' A cached table of Sleeper NFL players. Will store in memory for each session!
+#' A cached table of Sleeper MLB players. Will store in memory for each session!
 #' (via memoise in zzz.R)
 #'
 #' @examples
@@ -15,7 +15,7 @@
 #' @export
 
 sleeper_players <- function() {
-  df_players <- sleeper_getendpoint("players/nfl") %>%
+  df_players <- sleeper_getendpoint("players/mlb") %>%
     purrr::pluck("content") %>%
     tibble::tibble() %>%
     tidyr::unnest_wider(1) %>%

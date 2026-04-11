@@ -17,7 +17,7 @@
 #' @export
 ff_rosters.flea_conn <- function(conn, ...) {
   df_rosters <- fleaflicker_getendpoint("FetchLeagueRosters",
-    sport = "NFL",
+    sport = "MLB",
     external_id_type = "SPORTRADAR",
     league_id = conn$league_id
   ) %>%

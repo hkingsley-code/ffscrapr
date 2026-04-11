@@ -167,13 +167,13 @@ release_bullets <- function() {
   # nocov end
 }
 
-#' Mappings for nflfastr to fantasy platform scoring
+#' Mappings for stats to fantasy platform scoring
 #'
-#' A small helper dataframe for connecting nflfastr to specific fantasy platform rules.
+#' A small helper dataframe for connecting player stats to specific fantasy platform rules.
 #'
 #' @format A data frame with ~85 rows and 3 variables:
 #' \describe{
-#'   \item{nflfastr_event}{the column name of the statistic in the nflfastr_weekly dataset}
+#'   \item{nflfastr_event}{the column name of the statistic in the stats dataset}
 #'   \item{platform}{specific platform that this mapping applies to}
 #'   \item{ff_event}{name of the statistic for that platform}
 #' }

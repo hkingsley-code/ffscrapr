@@ -33,7 +33,7 @@ ff_draftpicks.flea_conn <- function(conn, franchise_id = NULL, ...) {
 
 .flea_get_teampicks <- function(franchise_id, conn) {
   teampicks <- fleaflicker_getendpoint("FetchTeamPicks",
-    sport = "NFL",
+    sport = "MLB",
     league_id = conn$league_id,
     team_id = franchise_id
   ) %>%

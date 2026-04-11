@@ -13,7 +13,7 @@ This vignette details how to connect to ESPN private leagues by retreiving the E
 
 ### Instructions
 
-1. Visit your main league page (i.e. https://fantasy.espn.com/football/team?leagueId=899513&seasonId=2020)
+1. Visit your main league page (i.e. https://fantasy.espn.com/baseball/team?leagueId=85601&seasonId=2024)
 2. Make sure you are logged in.
 3. Open Developer Tools (on Chrome/Firefox, right-click anywhere on the page and select `Inspect Element`)
 4. Go to Storage (for Firefox) or Application (for Chrome) and browse the `Cookies` available for `fantasy.espn.com`

@@ -70,7 +70,7 @@ ff_transactions.flea_conn <- function(conn, franchise_id = NULL, ...) {
   while (!is.null(result_offset)) {
     results <- fleaflicker_getendpoint(
       endpoint = "FetchLeagueTransactions",
-      sport = "NFL",
+      sport = "MLB",
       league_id = conn$league_id,
       team_id = franchise_id,
       result_offset = result_offset
@@ -225,7 +225,7 @@ ff_transactions.flea_conn <- function(conn, franchise_id = NULL, ...) {
   while (!is.null(result_offset)) {
     results <- fleaflicker_getendpoint(
       endpoint = "FetchTrades",
-      sport = "NFL",
+      sport = "MLB",
       filter = "TRADES_COMPLETED",
       league_id = conn$league_id,
       result_offset = 80

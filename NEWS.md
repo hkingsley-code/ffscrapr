@@ -1,3 +1,18 @@
+# ffscrapr 2.0.0
+
+The main goal of v2.0.0 is to convert ffscrapr from a fantasy football package to a fantasy baseball package. All ESPN API endpoints now point to the baseball (`flb`) API, position maps and stat maps have been updated for baseball, and Fleaflicker API calls now use `sport = "MLB"`.
+
+## Breaking Changes
+- ESPN API endpoints changed from `ffl` (football) to `flb` (baseball)
+- Position maps updated from football (QB, RB, WR, TE, K, DST) to baseball (C, 1B, 2B, 3B, SS, OF, SP, RP, DH, UTIL)
+- Team maps updated from NFL teams to MLB teams
+- Stat maps updated from football stats to baseball stats (AB, H, HR, RBI, ERA, WHIP, K, etc.)
+- `nflfastr_weekly()` and `nflfastr_rosters()` replaced with `baseball_stats()`
+- Template scoring/roster types updated for baseball
+- `nflreadr` dependency replaced with `baseballr`
+
+---
+
 # ffscrapr 1.4.7
 
 The main goal of v1.4.7 is to patch some minor bugs and to pre-emptively correct issues related to upstream dependency `tidyr`.

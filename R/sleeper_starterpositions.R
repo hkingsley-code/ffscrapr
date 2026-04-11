@@ -30,32 +30,33 @@ ff_starter_positions.sleeper_conn <- function(conn, ...) {
       pos = purrr::map_chr(.data$pos, unlist)
     )
 
-  flex <- ifelse(length(df_positions$min[df_positions$pos == "FLEX"]) == 0, 0, df_positions$min[df_positions$pos == "FLEX"])
-  wrrb_flex <- ifelse(length(df_positions$min[df_positions$pos == "WRRB_FLEX"]) == 0, 0, df_positions$min[df_positions$pos == "WRRB_FLEX"])
-  rec_flex <- ifelse(length(df_positions$min[df_positions$pos == "REC_FLEX"]) == 0, 0, df_positions$min[df_positions$pos == "REC_FLEX"])
-  super_flex <- ifelse(length(df_positions$min[df_positions$pos == "SUPER_FLEX"]) == 0, 0, df_positions$min[df_positions$pos == "SUPER_FLEX"])
-  idp_flex <- ifelse(length(df_positions$min[df_positions$pos == "IDP_FLEX"]) == 0, 0, df_positions$min[df_positions$pos == "IDP_FLEX"])
+  util <- ifelse(length(df_positions$min[df_positions$pos == "UTIL"]) == 0, 0, df_positions$min[df_positions$pos == "UTIL"])
+  inf_flex <- ifelse(length(df_positions$min[df_positions$pos == "IF"]) == 0, 0, df_positions$min[df_positions$pos == "IF"])
+  mi <- ifelse(length(df_positions$min[df_positions$pos == "MI"]) == 0, 0, df_positions$min[df_positions$pos == "MI"])
+  ci <- ifelse(length(df_positions$min[df_positions$pos == "CI"]) == 0, 0, df_positions$min[df_positions$pos == "CI"])
 
   df_positions %>%
     dplyr::mutate(
       max = dplyr::case_when(
-        .data$pos == "QB" ~ as.integer(.data$min + super_flex),
-        .data$pos == "RB" ~ as.integer(.data$min + wrrb_flex + super_flex + flex),
-        .data$pos == "WR" ~ as.integer(.data$min + wrrb_flex + rec_flex + super_flex + flex),
-        .data$pos == "TE" ~ as.integer(.data$min + rec_flex + super_flex + flex),
-        .data$pos %in% c("DL", "LB", "DB") ~ as.integer(.data$min + idp_flex),
+        .data$pos == "C" ~ as.integer(.data$min + util),
+        .data$pos == "1B" ~ as.integer(.data$min + ci + inf_flex + util),
+        .data$pos == "2B" ~ as.integer(.data$min + mi + inf_flex + util),
+        .data$pos == "3B" ~ as.integer(.data$min + ci + inf_flex + util),
+        .data$pos == "SS" ~ as.integer(.data$min + mi + inf_flex + util),
+        .data$pos == "OF" ~ as.integer(.data$min + util),
+        .data$pos == "DH" ~ as.integer(.data$min + util),
+        .data$pos %in% c("SP", "RP") ~ as.integer(.data$min),
         TRUE ~ as.integer(.data$min)
       ),
       total_starters = sum(.data$min, na.rm = TRUE),
-      offense_starters = sum(
-        .data$pos %in% c("QB", "RB", "WR", "TE", "FLEX", "WRRB_FLEX", "REC_FLEX", "SUPER_FLEX") * .data$min,
+      batter_starters = sum(
+        .data$pos %in% c("C", "1B", "2B", "3B", "SS", "OF", "DH", "UTIL", "IF", "MI", "CI") * .data$min,
         na.rm = TRUE
       ),
-      defense_starters = sum(.data$pos %in% c("IDP_FLEX", "DL", "LB", "DB") * .data$min, na.rm = TRUE),
-      kdef = sum(.data$pos %in% c("K", "DEF") * .data$min, na.rm = TRUE)
+      pitcher_starters = sum(.data$pos %in% c("SP", "RP", "P") * .data$min, na.rm = TRUE)
     ) %>%
-    dplyr::filter(stringr::str_detect(.data$pos, "FLEX", negate = TRUE)) %>%
+    dplyr::filter(stringr::str_detect(.data$pos, "UTIL|^IF$|^MI$|^CI$", negate = TRUE)) %>%
     dplyr::select(
-      "pos", "min", "max", "offense_starters", "defense_starters", "total_starters"
+      "pos", "min", "max", "batter_starters", "pitcher_starters", "total_starters"
     )
 }

@@ -4,27 +4,23 @@
 #'
 #' Scoring types defined here are:
 #'
-#' - `ppr`: 6 pt passing/rushing/receiving touchdowns, 0.1 for rushing/receiving yards, 1 point per reception, -2 for fumbles/interceptions
-#' - `half_ppr`: same as `ppr` but with 0.5 points per reception
-#' - `zero_ppr`: same as `ppr` but with 0 points per reception
-#' - `te_prem`: same as `ppr` but TEs get 1.5 points per reception
-#' - `sfb11`: scoring as defined here <https://scottfishbowl.com/2021/rules.php>
+#' - `standard`: Standard 5x5 roto scoring (R, HR, RBI, SB, AVG for batters; W, SV, K, ERA, WHIP for pitchers)
+#' - `points`: Points-based scoring with common category values
+#' - `h2h_cat`: Head-to-head categories scoring
 #'
 #' Roster settings defined here are:
 #'
-#' - `1qb`:  Starts 1 QB, 2 RB, 3 WR, 1 TE, 2 FLEX
-#' - `superflex`: Starts 1 QB, 2 RB, 3 WR, 1 TE, 2 FLEX, 1 SUPERFLEX
-#' - `sfb11`: Starts 1 QB, 2 RB, 3 WR, 1 TE, 3 FLEX, 1 SUPERFLEX (flex positions can also start a kicker)
-#' - `idp`: Starts same as 1QB but also starts 3 DL, 3 LB, 3 DB, and two IDP FLEX
+#' - `standard`: Starts 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF, 1 UTIL, 2 SP, 2 RP, 2 P
+#' - `deep`: Starts 2 C, 1 1B, 1 2B, 1 3B, 1 SS, 5 OF, 1 UTIL, 3 SP, 2 RP, 2 P
 #'
-#' @param scoring_type One of c("default", "ppr", "half_ppr", "zero_ppr", "te_prem", "sfb11")
-#' @param roster_type One of c("1qb", "superflex","sfb11", "idp")
+#' @param scoring_type One of c("standard", "points", "h2h_cat")
+#' @param roster_type One of c("standard", "deep")
 #'
 #' @return a connection object that can be used with `ff_scoring()`, `ff_scoringhistory()`, and `ff_starterpositions()`
 #' @export
 
-ff_template <- function(scoring_type = c("ppr", "half_ppr", "zero_ppr", "sfb11"),
-                        roster_type = c("1qb", "superflex", "sfb11", "idp")) {
+ff_template <- function(scoring_type = c("standard", "points", "h2h_cat"),
+                        roster_type = c("standard", "deep")) {
   scoring_type <- match.arg(scoring_type)
   roster_type <- match.arg(roster_type)
 

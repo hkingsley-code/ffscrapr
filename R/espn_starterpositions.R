@@ -10,7 +10,7 @@
 #' @examples
 #' \donttest{
 #' try({ # try only shown here because sometimes CRAN checks are weird
-#'   conn <- espn_connect(season = 2020, league_id = 1178049)
+#'   conn <- espn_connect(season = 2024, league_id = 85601)
 #'   ff_starter_positions(conn)
 #' }) # end try
 #' }
@@ -22,39 +22,34 @@ ff_starter_positions.espn_conn <- function(conn, ...) {
     tibble::enframe(name = "lineup_id", value = "count") %>%
     dplyr::mutate(pos = .espn_lineupslot_map()[as.character(.data$lineup_id)]) %>%
     tidyr::unnest(c("pos", "count")) %>%
-    # dplyr::left_join(.espn_pp_lineupkeys(), by = "lineup_id") %>%
     dplyr::mutate(
       min = ifelse(.data$pos %in% c(
-        "QB", "RB", "WR", "TE",
-        "TQB", "DT", "DE", "ER",
-        "LB", "CB", "S",
-        "K", "P", "DST", "HC"
+        "C", "1B", "2B", "3B", "SS", "OF",
+        "LF", "CF", "RF", "DH",
+        "SP", "RP", "P"
       ), .data$count, NA_integer_),
-      offense_starters = sum(.data$min * stringr::str_detect(.data$pos, "QB|RB|WR|TE|OP"), na.rm = TRUE),
-      defense_starters = sum(.data$min * stringr::str_detect(.data$pos, "DE|DT|DL|LB|CB|^S$|ER|DP"), na.rm = TRUE),
-      kdst_starters = sum(.data$min * .data$pos %in% c("K", "P", "DST", "HC"), na.rm = TRUE),
-      total_starters = .data$offense_starters + .data$defense_starters + .data$kdst_starters
+      batter_starters = sum(.data$min * stringr::str_detect(.data$pos, "C|1B|2B|3B|SS|OF|LF|CF|RF|DH"), na.rm = TRUE),
+      pitcher_starters = sum(.data$min * stringr::str_detect(.data$pos, "^SP$|^RP$|^P$"), na.rm = TRUE),
+      total_starters = .data$batter_starters + .data$pitcher_starters
     )
 
-  rbwr <- l_s$count[l_s$pos == "RB/WR"]
-  wrte <- l_s$count[l_s$pos == "WR/TE"]
-  rbwrte <- l_s$count[l_s$pos == "RB/WR/TE"]
-  op <- l_s$count[l_s$pos == "OP"]
-  dp <- l_s$count[l_s$pos == "DP"]
-  dl <- l_s$count[l_s$pos == "DL"]
-  db <- l_s$count[l_s$pos == "DB"]
+  util <- if (length(l_s$count[l_s$pos == "UTIL"]) > 0) l_s$count[l_s$pos == "UTIL"] else 0
+  mi <- if (length(l_s$count[l_s$pos == "2B/SS"]) > 0) l_s$count[l_s$pos == "2B/SS"] else 0
+  ci <- if (length(l_s$count[l_s$pos == "1B/3B"]) > 0) l_s$count[l_s$pos == "1B/3B"] else 0
+  inf <- if (length(l_s$count[l_s$pos == "IF"]) > 0) l_s$count[l_s$pos == "IF"] else 0
 
   l_s %>%
     dplyr::mutate(
       max = dplyr::case_when(
-        .data$pos == "QB" ~ .data$min + op,
-        .data$pos == "RB" ~ .data$min + rbwr + rbwrte + op,
-        .data$pos == "WR" ~ .data$min + rbwr + wrte + rbwrte + op,
-        .data$pos == "TE" ~ .data$min + wrte + rbwrte + op,
-        .data$pos == "DT" ~ .data$min + dl + dp,
-        .data$pos == "DE" ~ .data$min + dl + dp,
-        .data$pos == "CB" ~ .data$min + db + dp,
-        .data$pos == "S" ~ .data$min + db + dp,
+        .data$pos == "C" ~ .data$min + util,
+        .data$pos == "1B" ~ .data$min + ci + inf + util,
+        .data$pos == "2B" ~ .data$min + mi + inf + util,
+        .data$pos == "3B" ~ .data$min + ci + inf + util,
+        .data$pos == "SS" ~ .data$min + mi + inf + util,
+        .data$pos == "OF" ~ .data$min + util,
+        .data$pos == "DH" ~ .data$min + util,
+        .data$pos == "SP" ~ .data$min,
+        .data$pos == "RP" ~ .data$min,
         TRUE ~ .data$min
       ),
     ) %>%

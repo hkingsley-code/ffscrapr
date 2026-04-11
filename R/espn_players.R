@@ -1,6 +1,6 @@
 #' ESPN players library
 #'
-#' A cached table of ESPN NFL players. Will store in memory for each session!
+#' A cached table of ESPN MLB players. Will store in memory for each session!
 #' (via memoise in zzz.R)
 #'
 #' @param conn a connection object created by `espn_connect` or `ff_connect()`
@@ -32,7 +32,7 @@ espn_players <- function(conn = NULL, season = NULL) {
   xff <- httr::add_headers(`x-fantasy-filter` = xff)
 
   url_query <- glue::glue(
-    "https://fantasy.espn.com/apis/v3/games/flb/seasons/",
+    "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
     "{season}/players?scoringPeriodId=0&view=players_wl"
   )
 

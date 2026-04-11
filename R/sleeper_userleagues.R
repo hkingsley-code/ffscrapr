@@ -30,7 +30,7 @@ ff_userleagues.sleeper_conn <- function(conn = NULL, user_name = NULL, season = 
 
   if (is.null(season)) season <- .fn_choose_season()
 
-  df_leagues <- sleeper_getendpoint(glue::glue("user/{user_id}/leagues/nfl/{season}")) %>%
+  df_leagues <- sleeper_getendpoint(glue::glue("user/{user_id}/leagues/mlb/{season}")) %>%
     purrr::pluck("content") %>%
     purrr::map_dfr(`[`, c("name", "league_id")) %>%
     dplyr::rename(league_name = .data$name) %>%
