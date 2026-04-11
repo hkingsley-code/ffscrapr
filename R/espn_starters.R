@@ -106,11 +106,6 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (nrow(raw_starters) == 0) return(NULL)
 
-  message("[D] unique lineup_ids: ",
-          paste(sort(unique(raw_starters$lineup_id)), collapse=", "))
-  message("[D] sample: lineup_id=", raw_starters$lineup_id[1],
-          " player_id=", raw_starters$player_id[1])
-
   starters <- raw_starters %>%
     dplyr::mutate(
       lineup_slot = .espn_lineupslot_map()[as.character(.data$lineup_id)] %>% unname(),
@@ -191,9 +186,6 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 }
 
 .espn_week_starter <- function(week, conn, matchup_last_day = NULL) {
-  # Use the last daily scoring period of the target matchup week.
-  # Querying with the last day of the week causes the API to populate
-  # rosterForMatchupPeriod (weekly cumulative stats) for that week's entries.
   scoring_period_id <- if (!is.null(matchup_last_day[[as.character(week)]])) {
     matchup_last_day[[as.character(week)]]
   } else {
@@ -211,7 +203,8 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
 
   if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
 
-  raw <- tibble::tibble(x = schedule) %>%
+  # Filter schedule to just the target week and pivot home/away into rows
+  week_teams <- tibble::tibble(x = schedule) %>%
     tidyr::hoist("x", "week" = "matchupPeriodId", "home", "away") %>%
     dplyr::filter(.data$week == .env$week) %>%
     tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
@@ -219,41 +212,49 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     tidyr::hoist("team",
                  "franchise_id"    = "teamId",
                  "franchise_score" = "totalPoints",
-                 "starting_lineup" = "rosterForMatchupPeriod") %>%
+                 "slot_roster"     = "rosterForCurrentScoringPeriod",
+                 "score_roster"    = "rosterForMatchupPeriod") %>%
     dplyr::select(-"team", -"x") %>%
-    dplyr::filter(purrr::map_lgl(.data$starting_lineup, is.list))
+    dplyr::filter(purrr::map_lgl(.data$score_roster, is.list))
 
-  if (nrow(raw) == 0) return(tibble::tibble())
+  if (nrow(week_teams) == 0) return(tibble::tibble())
 
-  week_scores <- raw %>%
-    tidyr::hoist("starting_lineup", "entries") %>%
-    tidyr::unnest_longer("entries") %>%
-    dplyr::filter(purrr::map_lgl(.data$entries, is.list))
-
-  if (nrow(week_scores) == 0) return(tibble::tibble())
-
-  week_scores <- week_scores %>%
-    tidyr::hoist("entries",
+  # --- Weekly scores from rosterForMatchupPeriod (correct cumulative totals) ---
+  scores <- week_teams %>%
+    dplyr::select("franchise_id", "franchise_score", "score_roster") %>%
+    tidyr::hoist("score_roster", "score_entries" = "entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$score_entries, is.list)) %>%
+    tidyr::unnest_longer("score_entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$score_entries, is.list)) %>%
+    tidyr::hoist("score_entries",
                  "player_id"   = "playerId",
-                 "lineup_id"   = "lineupSlotId",
                  "player_data" = "playerPoolEntry") %>%
-    dplyr::filter(purrr::map_lgl(.data$player_data, is.list))
-
-  if (nrow(week_scores) == 0) return(tibble::tibble())
-
-  week_scores <- week_scores %>%
+    dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
     tidyr::hoist("player_data", "player_score" = "appliedStatTotal", "player") %>%
     dplyr::select(-"player_data") %>%
-    dplyr::filter(purrr::map_lgl(.data$player, is.list))
-
-  if (nrow(week_scores) == 0) return(tibble::tibble())
-
-  week_scores %>%
+    dplyr::filter(purrr::map_lgl(.data$player, is.list)) %>%
     tidyr::hoist("player",
                  "eligible_lineup_slots" = "eligibleSlots",
                  "player_name"           = "fullName",
                  "pos"                   = "defaultPositionId",
                  "team"                  = "proTeamId") %>%
-    dplyr::select(-"player") %>%
+    dplyr::select(-"player")
+
+  if (nrow(scores) == 0) return(tibble::tibble())
+
+  # --- Lineup slots from rosterForCurrentScoringPeriod (has real lineupSlotId) ---
+  slots <- week_teams %>%
+    dplyr::select("franchise_id", "slot_roster") %>%
+    dplyr::filter(purrr::map_lgl(.data$slot_roster, is.list)) %>%
+    tidyr::hoist("slot_roster", "slot_entries" = "entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$slot_entries, is.list)) %>%
+    tidyr::unnest_longer("slot_entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$slot_entries, is.list)) %>%
+    tidyr::hoist("slot_entries", "player_id" = "playerId", "lineup_id" = "lineupSlotId") %>%
+    dplyr::select("franchise_id", "player_id", "lineup_id")
+
+  # Join lineup slots onto scores
+  scores %>%
+    dplyr::left_join(slots, by = c("franchise_id", "player_id")) %>%
     dplyr::mutate(week = .env$week)
 }
