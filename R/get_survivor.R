@@ -40,6 +40,15 @@
 #'
 #' @export
 get_survivor <- function(conn, week) {
+  if (is.data.frame(conn)) {
+    stop(
+      "The first argument to get_survivor() must be a connection object (from ff_connect() ",
+      "or espn_connect() etc.), not a schedule tibble.\n",
+      "Usage: get_survivor(conn, week = ", week, ")",
+      call. = FALSE
+    )
+  }
+
   schedule   <- ff_schedule(conn)
   franchises <- ff_franchises(conn)
 
