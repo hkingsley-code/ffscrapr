@@ -24,6 +24,9 @@
 #'   \describe{
 #'     \item{loser}{A one-row tibble with \code{user_name} and
 #'       \code{franchise_score} of the team eliminated in \code{week}.}
+#'     \item{previously_eliminated}{A tibble of teams eliminated in weeks prior
+#'       to \code{week}, with columns \code{week}, \code{user_name}, and
+#'       \code{franchise_score}. Empty tibble if \code{week} is 1.}
 #'     \item{survivors}{A tibble of \code{user_name} values for all teams
 #'       still alive after \code{week}.}
 #'   }
@@ -85,6 +88,7 @@ get_survivor <- function(conn, week) {
   eliminated_ids <- character(0)
   all_ids        <- unique(schedule$franchise_id)
   loser_row      <- NULL
+  eliminated_log <- list()
 
   for (w in seq_len(week)) {
     alive <- schedule %>%
@@ -100,6 +104,7 @@ get_survivor <- function(conn, week) {
 
     loser_row      <- alive %>% dplyr::arrange(.data$franchise_score) %>% dplyr::slice(1)
     eliminated_ids <- c(eliminated_ids, loser_row$franchise_id)
+    eliminated_log[[w]] <- dplyr::select(loser_row, "week", "user_name", "franchise_score")
   }
 
   name_map <- dplyr::distinct(schedule, .data$franchise_id, .data$user_name)
@@ -108,8 +113,11 @@ get_survivor <- function(conn, week) {
     dplyr::left_join(name_map, by = "franchise_id") %>%
     dplyr::select("user_name")
 
+  all_eliminated <- dplyr::bind_rows(eliminated_log)
+
   list(
-    loser     = dplyr::select(loser_row, "user_name", "franchise_score"),
-    survivors = survivors
+    loser             = dplyr::select(loser_row, "user_name", "franchise_score"),
+    previously_eliminated = dplyr::slice(all_eliminated, -nrow(all_eliminated)),
+    survivors         = survivors
   )
 }

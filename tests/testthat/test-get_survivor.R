@@ -27,15 +27,18 @@ mock_franchises_no_user <- tibble::tibble(
 
 # ── Basic elimination logic ─────────────────────────────────────────────────
 
-test_that(".get_survivor_logic returns correct loser and survivors in week 1", {
+test_that(".get_survivor_logic returns correct loser, previously_eliminated, and survivors in week 1", {
   result <- ffscrapr:::.get_survivor_logic(mock_schedule, mock_franchises, week = 1)
 
   expect_type(result, "list")
-  expect_named(result, c("loser", "survivors"))
+  expect_named(result, c("loser", "previously_eliminated", "survivors"))
 
   # Franchise 2 (Bob) scored 50 — lowest in week 1
   expect_equal(result$loser$user_name, "Bob")
   expect_equal(result$loser$franchise_score, 50)
+
+  # No prior eliminations in week 1
+  expect_equal(nrow(result$previously_eliminated), 0)
 
   expect_setequal(result$survivors$user_name, c("Alice", "Carol"))
 })
@@ -47,6 +50,12 @@ test_that(".get_survivor_logic skips previously eliminated teams in later weeks"
   expect_equal(result$loser$user_name, "Alice")
   expect_equal(result$loser$franchise_score, 70)
   expect_equal(result$survivors$user_name, "Carol")
+
+  # Bob should appear in previously_eliminated with week 1 score
+  expect_equal(nrow(result$previously_eliminated), 1)
+  expect_equal(result$previously_eliminated$user_name, "Bob")
+  expect_equal(result$previously_eliminated$week, 1)
+  expect_equal(result$previously_eliminated$franchise_score, 50)
 })
 
 test_that(".get_survivor_logic works when only one team remains", {
@@ -71,6 +80,8 @@ test_that(".get_survivor_logic always returns user_name column, never franchise_
   expect_true("franchise_score" %in% names(result$loser))
   expect_false("franchise_id" %in% names(result$loser))
   expect_false("franchise_name" %in% names(result$loser))
+
+  expect_true(all(c("week", "user_name", "franchise_score") %in% names(result$previously_eliminated)))
 
   expect_true("user_name" %in% names(result$survivors))
   expect_false("franchise_id" %in% names(result$survivors))
