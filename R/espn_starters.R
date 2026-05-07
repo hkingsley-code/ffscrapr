@@ -247,6 +247,29 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     dplyr::mutate(scoring_day = .env$day)
 }
 
+#' Get the latest completed scoring week for an ESPN league
+#'
+#' Returns the highest matchup week that has already started, based on ESPN's
+#' current scoring period. Useful for determining which week to pass to
+#' \code{\link{get_weekly_points}} without fetching all weeks first.
+#'
+#' @param conn A connection object created by \code{\link{espn_connect}}.
+#'
+#' @return An integer giving the latest available matchup week number.
+#'
+#' @examples
+#' \donttest{
+#' try({
+#'   conn <- espn_connect(season = 2026, league_id = 85601)
+#'   espn_current_week(conn)
+#' })
+#' }
+#'
+#' @export
+espn_current_week <- function(conn) {
+  .espn_week_checkmax(conn)$max_week
+}
+
 .espn_week_starter <- function(week, conn, matchup_days = NULL) {
   week_days <- if (!is.null(matchup_days[[as.character(week)]])) {
     matchup_days[[as.character(week)]]
