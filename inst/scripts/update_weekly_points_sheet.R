@@ -1,6 +1,9 @@
 # update_weekly_points_sheet.R
-# Fetches the latest completed week's fantasy points from ESPN and appends
-# them to the 'Weekly Points' tab in Google Sheets.
+# Fetches the latest completed week's fantasy points and stats from ESPN and
+# appends them to the 'Weekly Points' tab in Google Sheets.
+#
+# Columns written: week, user_name, hitting_points, pitching_points,
+#   total_points, H, AB, HR, RBI, R, SB, OBP, SLG, OPS, IP, ERA, WHIP, K, W, SV
 #
 # Dependencies: ffscrapr, googlesheets4, dplyr
 # First run opens a browser for Google OAuth; subsequent runs reuse the cached token.
@@ -19,7 +22,7 @@ conn <- espn_connect(season = SEASON, league_id = LEAGUE_ID)
 current_week <- espn_current_week(conn)
 message("Latest completed week: ", current_week)
 
-new_data <- get_weekly_points(conn, week = current_week)
+new_data <- get_weekly_stats(conn, week = current_week)
 
 if (is.null(new_data) || nrow(new_data) == 0) {
   message("No data available for week ", current_week, ". Nothing written.")
