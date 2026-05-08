@@ -39,7 +39,7 @@ if (!SHEET_TAB %in% tab_names) {
   message("Created tab: ", SHEET_TAB)
 }
 
-existing <- read_sheet(sheet_id, sheet = SHEET_TAB, col_types = "i----")
+existing <- read_sheet(sheet_id, sheet = SHEET_TAB, col_types = paste0("i", strrep("-", 19)))
 
 if (nrow(existing) > 0 && current_week %in% existing$week) {
   message("Week ", current_week, " already in sheet. No rows appended.")
