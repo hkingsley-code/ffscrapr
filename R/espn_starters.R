@@ -321,7 +321,8 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     tidyr::pivot_wider(
       names_from  = "stat",
       values_from = "value",
-      values_fill = 0
+      values_fill = 0,
+      values_fn   = sum
     ) %>%
     dplyr::mutate(scoring_day = .env$day)
 }
