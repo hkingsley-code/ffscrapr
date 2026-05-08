@@ -292,7 +292,11 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
         if (is.null(s) || length(s) == 0) return(tibble::tibble())
         # statSplitTypeId 5 = specific scoring period; statSourceId 0 = actual (not projected)
         matching <- purrr::keep(s, function(x) {
-          isTRUE(x[["statSplitTypeId"]] == 5) && isTRUE(x[["statSourceId"]] == 0)
+          is.list(x) &&
+            !is.null(x[["statSplitTypeId"]]) &&
+            !is.null(x[["statSourceId"]]) &&
+            isTRUE(x[["statSplitTypeId"]] == 5) &&
+            isTRUE(x[["statSourceId"]] == 0)
         })
         if (length(matching) == 0) return(tibble::tibble())
         stat_dict <- matching[[1]][["stats"]]
