@@ -247,6 +247,133 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
     dplyr::mutate(scoring_day = .env$day)
 }
 
+.espn_day_raw_stats <- function(day, week, conn) {
+  url_query <- glue::glue(
+    "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/",
+    "{conn$season}/segments/0/leagues/{conn$league_id}",
+    "?scoringPeriodId={day}&view=mMatchupScore&view=mBoxscore&view=mRoster"
+  )
+
+  schedule <- espn_getendpoint_raw(conn, url_query) %>%
+    purrr::pluck("content", "schedule")
+
+  if (is.null(schedule) || length(schedule) == 0) return(tibble::tibble())
+
+  week_teams <- tibble::tibble(x = schedule) %>%
+    tidyr::hoist("x", "week" = "matchupPeriodId", "home", "away") %>%
+    dplyr::filter(.data$week == .env$week) %>%
+    tidyr::pivot_longer(c(.data$home, .data$away), names_to = NULL, values_to = "team") %>%
+    dplyr::filter(purrr::map_lgl(.data$team, is.list)) %>%
+    tidyr::hoist("team",
+                 "franchise_id" = "teamId",
+                 "slot_roster"  = "rosterForCurrentScoringPeriod") %>%
+    dplyr::select(-"team", -"x") %>%
+    dplyr::filter(purrr::map_lgl(.data$slot_roster, is.list))
+
+  if (nrow(week_teams) == 0) return(tibble::tibble())
+
+  stat_map <- .espn_stat_map()
+
+  base <- week_teams %>%
+    dplyr::select("franchise_id", "slot_roster") %>%
+    tidyr::hoist("slot_roster", "entries" = "entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
+    tidyr::unnest_longer("entries") %>%
+    dplyr::filter(purrr::map_lgl(.data$entries, is.list)) %>%
+    tidyr::hoist("entries",
+                 "player_id"   = "playerId",
+                 "lineup_id"   = "lineupSlotId",
+                 "player_data" = "playerPoolEntry") %>%
+    dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
+    # stats live at playerPoolEntry.player.stats, not playerPoolEntry.stats
+    tidyr::hoist("player_data", "player_obj" = "player") %>%
+    dplyr::select(-"player_data") %>%
+    dplyr::filter(purrr::map_lgl(.data$player_obj, is.list)) %>%
+    tidyr::hoist("player_obj", "raw_stats" = "stats") %>%
+    dplyr::select(-"player_obj") %>%
+    dplyr::select("franchise_id", "player_id", "lineup_id", "raw_stats") %>%
+    dplyr::mutate(
+      stat_tbl = purrr::map(.data$raw_stats, function(s) {
+        if (is.null(s) || length(s) == 0) return(tibble::tibble())
+        # statSplitTypeId 5 = specific scoring period; statSourceId 0 = actual (not projected)
+        matching <- purrr::keep(s, function(x) {
+          is.list(x) &&
+            !is.null(x[["statSplitTypeId"]]) &&
+            !is.null(x[["statSourceId"]]) &&
+            isTRUE(x[["statSplitTypeId"]] == 5) &&
+            isTRUE(x[["statSourceId"]] == 0)
+        })
+        if (length(matching) == 0) return(tibble::tibble())
+        stat_dict <- matching[[1]][["stats"]]
+        if (is.null(stat_dict) || length(stat_dict) == 0) return(tibble::tibble())
+        nms   <- stat_map[names(stat_dict)]
+        valid <- !is.na(nms)
+        if (!any(valid)) return(tibble::tibble())
+        tibble::tibble(stat = nms[valid], value = as.numeric(unlist(stat_dict)[valid]))
+      }),
+      raw_stats = NULL
+    )
+
+  if (all(purrr::map_lgl(base$stat_tbl, ~ nrow(.x) == 0))) return(tibble::tibble())
+
+  base %>%
+    tidyr::unnest("stat_tbl") %>%
+    tidyr::pivot_wider(
+      names_from  = "stat",
+      values_from = "value",
+      values_fill = 0,
+      values_fn   = sum
+    ) %>%
+    dplyr::mutate(scoring_day = .env$day)
+}
+
+.espn_week_raw_stats <- function(week, conn, matchup_days = NULL) {
+  week_days <- if (!is.null(matchup_days[[as.character(week)]])) {
+    matchup_days[[as.character(week)]]
+  } else {
+    week
+  }
+
+  daily <- purrr::map_dfr(week_days, .espn_day_raw_stats, week = week, conn = conn)
+
+  if (nrow(daily) == 0) return(tibble::tibble())
+
+  key_cols  <- c("franchise_id", "player_id", "lineup_id", "scoring_day")
+  stat_cols <- names(daily)[!names(daily) %in% key_cols]
+  stat_cols <- stat_cols[vapply(daily[stat_cols], is.numeric, logical(1L))]
+
+  daily %>%
+    dplyr::group_by(.data$franchise_id, .data$player_id, .data$lineup_id) %>%
+    dplyr::summarise(
+      dplyr::across(dplyr::all_of(stat_cols), ~ sum(.x, na.rm = TRUE)),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(week = .env$week)
+}
+
+#' Get the latest completed scoring week for an ESPN league
+#'
+#' Returns the highest matchup week that has already started, based on ESPN's
+#' current scoring period. Useful for determining which week to pass to
+#' \code{\link{get_weekly_points}} without fetching all weeks first.
+#'
+#' @param conn A connection object created by \code{\link{espn_connect}}.
+#'
+#' @return An integer giving the latest available matchup week number.
+#'
+#' @examples
+#' \donttest{
+#' try({
+#'   conn <- espn_connect(season = 2026, league_id = 85601)
+#'   espn_current_week(conn)
+#' })
+#' }
+#'
+#' @export
+espn_current_week <- function(conn) {
+  .espn_week_checkmax(conn)$max_week
+}
+
 .espn_week_starter <- function(week, conn, matchup_days = NULL) {
   week_days <- if (!is.null(matchup_days[[as.character(week)]])) {
     matchup_days[[as.character(week)]]

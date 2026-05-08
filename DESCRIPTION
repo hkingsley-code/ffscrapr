@@ -46,6 +46,7 @@ Imports:
     tidyr (>= 1.0.0)
 Suggests:
     baseballr (>= 0.9.0),
+    googlesheets4 (>= 2.0.0),
     covr (>= 3.0.0),
     curl (>= 4.0.0),
     httptest (>= 3.0.0),
