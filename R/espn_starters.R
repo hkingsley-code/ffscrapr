@@ -285,7 +285,12 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
                  "lineup_id"   = "lineupSlotId",
                  "player_data" = "playerPoolEntry") %>%
     dplyr::filter(purrr::map_lgl(.data$player_data, is.list)) %>%
-    tidyr::hoist("player_data", "raw_stats" = "stats") %>%
+    # stats live at playerPoolEntry.player.stats, not playerPoolEntry.stats
+    tidyr::hoist("player_data", "player_obj" = "player") %>%
+    dplyr::select(-"player_data") %>%
+    dplyr::filter(purrr::map_lgl(.data$player_obj, is.list)) %>%
+    tidyr::hoist("player_obj", "raw_stats" = "stats") %>%
+    dplyr::select(-"player_obj") %>%
     dplyr::select("franchise_id", "player_id", "lineup_id", "raw_stats") %>%
     dplyr::mutate(
       stat_tbl = purrr::map(.data$raw_stats, function(s) {
