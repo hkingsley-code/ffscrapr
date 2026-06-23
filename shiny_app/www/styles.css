@@ -1,0 +1,72 @@
+/* League History Shiny App */
+
+body {
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+.navbar {
+  font-weight: 500;
+}
+
+/* Summary cards */
+.card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.card-subtitle {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.card-text {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+/* Alert for missing data */
+.alert {
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+}
+
+/* DataTable tweaks */
+.dataTables_wrapper .dataTables_filter input {
+  border-radius: 4px;
+}
+
+table.dataTable thead th {
+  white-space: nowrap;
+}
+
+/* Well panel */
+.well {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+/* Chart containers */
+.plotly {
+  border-radius: 6px;
+}
