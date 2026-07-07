@@ -156,6 +156,10 @@ ff_starters.espn_conn <- function(conn, weeks = 1:26, ...) {
   # Each schedule entry's home$pointsByScoringPeriod has daily period IDs as names.
   schedule <- purrr::pluck(content, "schedule")
 
+  if (is.null(schedule) || length(schedule) == 0) {
+    return(list(max_week = 0L, matchup_days = list()))
+  }
+
   # Collect all unique daily period IDs per matchup week
   matchup_days_raw <- purrr::map_dfr(schedule, function(entry) {
     pbs <- entry$home$pointsByScoringPeriod

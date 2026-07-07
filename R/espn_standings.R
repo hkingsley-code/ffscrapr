@@ -21,8 +21,20 @@ ff_standings.espn_conn <- function(conn, ...) {
     espn_getendpoint(conn, view = "mTeam") %>%
     purrr::pluck("content")
 
-  standings_init <- team_endpoint %>%
-    purrr::pluck("teams") %>%
+  teams_raw <- purrr::pluck(team_endpoint, "teams")
+
+  if (is.null(teams_raw) || length(teams_raw) == 0) {
+    warning(
+      glue::glue(
+        "ESPN could not retrieve standings for {conn$season} league {conn$league_id}. ",
+        "If this is a private league, supply espn_s2 and swid to espn_connect()."
+      ),
+      call. = FALSE
+    )
+    return(NULL)
+  }
+
+  standings_init <- teams_raw %>%
     tibble::tibble() %>%
     tidyr::hoist(
       .col = 1,
