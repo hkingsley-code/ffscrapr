@@ -38,9 +38,13 @@ espn_getendpoint <- function(conn, ..., x_fantasy_filter = NULL) {
   }
 
   if (as.numeric(conn$season) < 2018) {
+    # NOTE: httr::modify_url() replaces the parsed url's entire `query`
+    # component rather than merging it - so seasonId must be combined with
+    # the other query args here rather than embedded in the base url string,
+    # or it gets silently dropped whenever `...` is non-empty (e.g. view=).
     url_query <- httr::modify_url(
-      url = glue::glue("https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/leagueHistory/{conn$league_id}?seasonId={conn$season}"),
-      query = list(...)
+      url = glue::glue("https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/leagueHistory/{conn$league_id}"),
+      query = c(list(seasonId = conn$season), list(...))
     )
   }
 
