@@ -104,6 +104,19 @@ ui <- navbarPage(
       } else {
         tagList(
           fluidRow(
+            column(12,
+              div(
+                class = "alert alert-info",
+                icon("circle-info"), " ",
+                "ESPN only retains trade/transaction history for the ",
+                strong("current active season"), " through this API. Past seasons' trade logs ",
+                "are not retrievable even with valid login credentials — this is a limitation ",
+                "of ESPN's data retention, not something this app can work around. As each season ",
+                "completes, its trade history will remain available going forward from that point."
+              )
+            )
+          ),
+          fluidRow(
             column(3,
               wellPanel(
                 selectInput(
