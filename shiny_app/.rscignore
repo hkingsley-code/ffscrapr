@@ -1,6 +1,0 @@
-# Exclude the offline data-fetching pipeline from deployment.
-# fetch_all_seasons.R calls library(ffscrapr), which the deployed app itself
-# never needs (it only reads pre-fetched .rds files from data/). Without this,
-# rsconnect's dependency scanner picks up ffscrapr from this script and tries
-# to install the outdated CRAN release at deploy time, which fails.
-scripts/
