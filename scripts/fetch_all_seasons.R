@@ -17,7 +17,7 @@
 #   Rscript scripts/fetch_all_seasons.R
 #
 # For trade history (2019+), set environment variables before running:
-#   Sys.setenv(ESPN_S2 = "<value>", SWID = "<value>")   # in R
+Sys.setenv(ESPN_S2 = "AEA%2BLeXn7cJ5jCK3zNIlM5wXSsM93n6NBZXZ2hyXQSVumrnUHiw9Wo4SV6Nr8M2u7AGsQlY31OO%2BYpXCTDymr5b%2FoOyLIIB1r%2FzE09evOKG7KQqJ8VtxORb3K4FILjDwcy%2F2mUEet8OCDQWGVggg7JO7we4xoxHVZJr7FQLqYGi03t5oBSBk7v726psYT%2FqmUg9SSdt5xcqJPZfdrjnyxEq0GHBPHjtNQXc3MI2RQYFupPiClwgCTuLx7Z1KOKWRdcf6545pHlffotCr8Qx6SkW8iWA2bjulOkuwAd8q1d7v9Q%3D%3D", SWID = "{97F6200B-A3AE-4952-92FC-35D98A97EFBF}")   # in R
 #   export ESPN_S2="..." SWID="..."                      # in bash/zsh
 # See vignettes/espn_authentication.Rmd for how to extract these from your browser.
 
