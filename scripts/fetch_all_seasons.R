@@ -3,12 +3,18 @@
 # Run this script ONCE (offline) to populate shiny_app/data/ with cached .rds files.
 # Re-run at the end of each season, or weekly during an active season.
 #
+# This script lives OUTSIDE shiny_app/ on purpose: it calls library(ffscrapr),
+# which the deployed Shiny app never needs (the app only reads pre-fetched
+# .rds files). Keeping it out of shiny_app/ ensures deployment tools (rsconnect,
+# Posit Connect Cloud) never see or bundle it, so ffscrapr is never mistaken
+# for a runtime dependency.
+#
 # SETUP — install the dev version of ffscrapr from this repo first:
 #   devtools::install(".")           # from the repo root in R
 #   # OR: install.packages("devtools"); devtools::install_github("hkingsley-code/ffscrapr")
 #
 # USAGE (from the repo root):
-#   Rscript shiny_app/scripts/fetch_all_seasons.R
+#   Rscript scripts/fetch_all_seasons.R
 #
 # For trade history (2019+), set environment variables before running:
 #   Sys.setenv(ESPN_S2 = "<value>", SWID = "<value>")   # in R
@@ -36,10 +42,11 @@ if (!nchar(ESPN_S2)) ESPN_S2 <- NULL
 if (!nchar(SWID))    SWID    <- NULL
 
 # ── Robust DATA_DIR resolution ────────────────────────────────────────────────
-# Priority order:
+# Resolves to <repo_root>/shiny_app/data regardless of current working
+# directory. Priority order:
 #   1. --file= arg  (Rscript path/to/fetch_all_seasons.R)
 #   2. sys.frames   (source("path/to/fetch_all_seasons.R"))
-#   3. getwd()      (only correct when run from shiny_app/)
+#   3. getwd()      (only correct when run from the repo root)
 
 .resolve_data_dir <- function() {
   # 1. Rscript CLI
@@ -47,7 +54,7 @@ if (!nchar(SWID))    SWID    <- NULL
   if (length(file_arg) > 0) {
     script_path <- sub("^--file=", "", file_arg[1])
     script_dir  <- dirname(normalizePath(script_path, mustWork = FALSE))
-    return(normalizePath(file.path(script_dir, "..", "data"), mustWork = FALSE))
+    return(normalizePath(file.path(script_dir, "..", "shiny_app", "data"), mustWork = FALSE))
   }
 
   # 2. source()
@@ -56,12 +63,12 @@ if (!nchar(SWID))    SWID    <- NULL
     error = function(e) NULL
   )
   if (!is.null(script_dir)) {
-    return(normalizePath(file.path(script_dir, "..", "data"), mustWork = FALSE))
+    return(normalizePath(file.path(script_dir, "..", "shiny_app", "data"), mustWork = FALSE))
   }
 
-  # 3. Fallback — assumes CWD is shiny_app/
-  message("Note: could not auto-detect script location. Placing data/ inside your working directory.")
-  normalizePath(file.path(getwd(), "data"), mustWork = FALSE)
+  # 3. Fallback — assumes CWD is the repo root
+  message("Note: could not auto-detect script location. Assuming CWD is the repo root.")
+  normalizePath(file.path(getwd(), "shiny_app", "data"), mustWork = FALSE)
 }
 
 DATA_DIR <- .resolve_data_dir()
