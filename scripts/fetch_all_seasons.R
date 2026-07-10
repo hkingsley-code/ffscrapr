@@ -57,6 +57,16 @@ SWID      <- Sys.getenv("SWID",    unset = "")
 if (!nchar(ESPN_S2)) ESPN_S2 <- NULL
 if (!nchar(SWID))    SWID    <- NULL
 
+# Some seasons' week 1 spans an early opening-series stretch (real MLB games, but
+# before the league's recognized season start) that ESPN folds into week 1's day
+# range. Listed seasons have week 1 recomputed using ONLY these scoring periods
+# instead of ESPN's auto-derived (over-inclusive) day list.
+# 2026: periods 1-5 = Mar 25-29 (early opener, excluded); 6-12 = Mar 30 onward (kept).
+# Verified against ff_schedule()'s official week-1 total (diff 16.0 of 4018.5, ~0.4%).
+WEEK1_PERIOD_OVERRIDE <- list(
+  "2026" = 6:12
+)
+
 # ── Robust DATA_DIR resolution ────────────────────────────────────────────────
 # Resolves to <repo_root>/shiny_app/data regardless of current working
 # directory. Priority order:
@@ -197,6 +207,25 @@ fetch_season <- function(season) {
   } else {
     message("  SKIP weekly_stats: not available before 2018")
     NULL
+  }
+
+  # Apply the week-1 period override, if this season has one configured.
+  season_key <- as.character(season)
+  if (!is.null(weekly_stats) && season_key %in% names(WEEK1_PERIOD_OVERRIDE)) {
+    periods <- WEEK1_PERIOD_OVERRIDE[[season_key]]
+    corrected_wk1 <- tryCatch(
+      ffscrapr:::.get_weekly_stats_custom_periods(conn, week = 1L, periods = periods),
+      error = function(e) {
+        message("  WARN: week-1 override failed: ", conditionMessage(e))
+        NULL
+      }
+    )
+    if (!is.null(corrected_wk1)) {
+      weekly_stats <- weekly_stats %>%
+        filter(week != 1L) %>%
+        bind_rows(corrected_wk1)
+      message("  Week 1 recomputed using scoring periods ", paste(range(periods), collapse = "-"))
+    }
   }
 
   # Transactions / trades (requires auth cookies, only 2019+)

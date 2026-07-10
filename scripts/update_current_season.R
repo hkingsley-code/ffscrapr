@@ -30,6 +30,16 @@ LEAGUE_ID <- 85601L
 APP_NAME  <- "league-85601"
 SEASON    <- as.integer(format(Sys.Date(), "%Y"))
 
+# Some seasons' week 1 spans an early opening-series stretch (real MLB games, but
+# before the league's recognized season start) that ESPN folds into week 1's day
+# range. Listed seasons have week 1 recomputed using ONLY these scoring periods
+# instead of ESPN's auto-derived (over-inclusive) day list.
+# 2026: periods 1-5 = Mar 25-29 (early opener, excluded); 6-12 = Mar 30 onward (kept).
+# Verified against ff_schedule()'s official week-1 total (diff 16.0 of 4018.5, ~0.4%).
+WEEK1_PERIOD_OVERRIDE <- list(
+  "2026" = 6:12
+)
+
 # ── Resolve repo root from this script's location (robust to cwd) ─────────────
 .script_dir <- local({
   file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
@@ -84,6 +94,22 @@ weekly_stats <- tryCatch({
     get_weekly_stats(conn, week = seq_len(checkmax$max_week))
   }
 }, error = function(e) { log("get_weekly_stats: ", conditionMessage(e)); NULL })
+
+# Apply the week-1 period override, if this season has one configured.
+season_key <- as.character(SEASON)
+if (!is.null(weekly_stats) && season_key %in% names(WEEK1_PERIOD_OVERRIDE)) {
+  periods <- WEEK1_PERIOD_OVERRIDE[[season_key]]
+  corrected_wk1 <- tryCatch(
+    ffscrapr:::.get_weekly_stats_custom_periods(conn, week = 1L, periods = periods),
+    error = function(e) { log("week-1 override failed: ", conditionMessage(e)); NULL }
+  )
+  if (!is.null(corrected_wk1)) {
+    weekly_stats <- weekly_stats %>%
+      filter(week != 1L) %>%
+      bind_rows(corrected_wk1)
+    log("Week 1 recomputed using scoring periods ", paste(range(periods), collapse = "-"))
+  }
+}
 
 transactions <- tryCatch({
   txn <- ff_transactions(conn)
