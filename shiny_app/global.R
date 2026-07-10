@@ -183,6 +183,25 @@ all_schedules <- all_schedules %>%
                                     opponent_owner_key = owner_key),
             by = c("season", "opponent_id" = "franchise_id"))
 
+# ── Mask in-progress (partial) weeks ─────────────────────────────────────────
+# ESPN reports a premature W/L for the current, partially-played week (its total
+# scoring is a fraction of a finished week). Detect weeks whose scoring is far
+# below the season's completed-week norm and blank their result, so an in-progress
+# matchup never counts as a win or loss (fixes H2H showing current games as losses).
+week_completeness <- all_schedules %>%
+  filter(!is.na(result)) %>%
+  group_by(season, week) %>%
+  summarise(wk_total = sum(abs(franchise_score), na.rm = TRUE), .groups = "drop") %>%
+  group_by(season) %>%
+  mutate(incomplete = wk_total < 0.4 * median(wk_total)) %>%
+  ungroup()
+
+all_schedules <- all_schedules %>%
+  left_join(week_completeness %>% select(season, week, incomplete),
+            by = c("season", "week")) %>%
+  mutate(result = if_else(coalesce(incomplete, FALSE), NA_character_, result)) %>%
+  select(-incomplete)
+
 # Weekly stats carry the owner name (user_name) but no franchise_id, so map to
 # owner_key via (season, original owner name) — this also applies owner_overrides.
 if (nrow(all_weekly_stats) > 0) {
