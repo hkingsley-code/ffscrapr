@@ -58,14 +58,18 @@ if (!is.null(off_days)) {
       "\n\n")
 }
 
-# 3) Per-period point totals (helps confirm which are the low pre-season days)
-cat("D) Per scoring period: total points across all teams (low early ones = pre-season):\n")
+# 3) Per-period point totals — sum the PER-PLAYER appliedStatTotal (player_score),
+#    which is what get_weekly_stats() actually uses and genuinely varies by day.
+#    (franchise_score/totalPoints is the matchup's running CUMULATIVE total and is
+#    identical for every day queried — do not use it here, that was the earlier bug.)
+cat("D) Per scoring period: real per-day production, summed across all players/teams\n")
+cat("   (pre-season days with no MLB games should be ~0; real week-1 days will be large):\n")
 per <- purrr::map_dfr(sort(gws_days), function(dy) {
   r <- tryCatch(ffscrapr:::.espn_day_roster(dy, WEEK, conn), error = function(e) NULL)
-  pts <- if (is.null(r) || nrow(r) == 0) NA_real_ else {
-    r |> dplyr::distinct(franchise_id, franchise_score) |> dplyr::pull(franchise_score) |> sum(na.rm = TRUE)
-  }
-  tibble::tibble(scoring_period = dy, all_team_points = round(pts, 1))
+  pts <- if (is.null(r) || nrow(r) == 0) NA_real_ else sum(r$player_score, na.rm = TRUE)
+  n_nonzero <- if (is.null(r) || nrow(r) == 0) NA_integer_ else sum(r$player_score != 0, na.rm = TRUE)
+  tibble::tibble(scoring_period = dy, total_player_points = round(pts, 1),
+                nonzero_player_rows = n_nonzero)
 })
 print(as.data.frame(per), row.names = FALSE)
 
