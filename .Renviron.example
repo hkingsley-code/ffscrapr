@@ -1,0 +1,12 @@
+# Template for ESPN private-league credentials used by scripts/fetch_all_seasons.R
+#
+# 1. Copy this file to `.Renviron` (which is gitignored — never commit real values):
+#      cp .Renviron.example .Renviron
+# 2. Replace the placeholders below with your own cookies.
+# 3. Extract the values from your browser while logged in to fantasy.espn.com —
+#    see vignettes/espn_authentication.Rmd for step-by-step instructions.
+#
+# ESPN_S2 is a long URL-encoded string (~250+ chars). SWID includes the braces.
+
+ESPN_S2=PASTE_YOUR_ESPN_S2_COOKIE_HERE
+SWID={PASTE-YOUR-SWID-INCLUDING-BRACES}

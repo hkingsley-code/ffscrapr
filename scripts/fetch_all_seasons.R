@@ -16,14 +16,30 @@
 # USAGE (from the repo root):
 #   Rscript scripts/fetch_all_seasons.R
 #
-# For trade history (2019+), set environment variables before running:
-Sys.setenv(ESPN_S2 = "AEA%2BLeXn7cJ5jCK3zNIlM5wXSsM93n6NBZXZ2hyXQSVumrnUHiw9Wo4SV6Nr8M2u7AGsQlY31OO%2BYpXCTDymr5b%2FoOyLIIB1r%2FzE09evOKG7KQqJ8VtxORb3K4FILjDwcy%2F2mUEet8OCDQWGVggg7JO7we4xoxHVZJr7FQLqYGi03t5oBSBk7v726psYT%2FqmUg9SSdt5xcqJPZfdrjnyxEq0GHBPHjtNQXc3MI2RQYFupPiClwgCTuLx7Z1KOKWRdcf6545pHlffotCr8Qx6SkW8iWA2bjulOkuwAd8q1d7v9Q%3D%3D", SWID = "{97F6200B-A3AE-4952-92FC-35D98A97EFBF}")   # in R
-#   export ESPN_S2="..." SWID="..."                      # in bash/zsh
+# For trade history (2019+), provide your ESPN login cookies via a GITIGNORED
+# `.Renviron` file at the repo root (never commit real cookies). Copy the
+# template and fill it in:
+#   cp .Renviron.example .Renviron   # then edit .Renviron with your values
+# `.Renviron` is auto-loaded below. It should contain:
+#   ESPN_S2=<your espn_s2 cookie>
+#   SWID={your-swid-including-braces}
+# Alternatively export ESPN_S2 / SWID in your shell before running.
 # See vignettes/espn_authentication.Rmd for how to extract these from your browser.
 
 library(ffscrapr)
 library(dplyr)
 library(purrr)
+
+# Load a repo-root .Renviron (gitignored) if present, regardless of cwd.
+local({
+  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  script_dir <- if (length(file_arg) > 0) {
+    dirname(normalizePath(sub("^--file=", "", file_arg[1]), mustWork = FALSE))
+  } else tryCatch(dirname(normalizePath(sys.frames()[[1]]$ofile)),
+                  error = function(e) getwd())
+  renv <- normalizePath(file.path(script_dir, "..", ".Renviron"), mustWork = FALSE)
+  if (file.exists(renv)) readRenviron(renv)
+})
 
 # ── Verify dev version is installed (needed to avoid "parsed not found" bug) ──
 if (!exists("get_weekly_stats", mode = "function")) {
