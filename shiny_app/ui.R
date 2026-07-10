@@ -6,31 +6,79 @@ ui <- navbarPage(
   theme = bs_theme(version = 5, bootswatch = "flatly"),
   header = tags$head(tags$link(rel = "stylesheet", href = "styles.css")),
 
-  # ── Tab 1: Weekly Scores ──────────────────────────────────────────────────
+  # ── Tab 1 (home): Total Points ────────────────────────────────────────────
+  tabPanel(
+    "Total Points",
+    icon = icon("chart-bar"),
+    fluidPage(
+      if (length(STATS_SEASONS) == 0) {
+        fluidRow(
+          column(12,
+            div(
+              class = "alert alert-warning",
+              icon("circle-exclamation"), " ",
+              "Detailed weekly stats are only available from 2018 onward.",
+              " Fallback: season-level Points For from standings is shown below."
+            )
+          )
+        )
+      } else {
+        tagList(
+          fluidRow(
+            column(3,
+              wellPanel(
+                selectInput(
+                  "tp_season", "Season",
+                  choices  = c("All seasons (cumulative)" = "all", rev(STATS_SEASONS)),
+                  selected = max(STATS_SEASONS)
+                )
+              )
+            ),
+            column(9,
+              h4("Points Leaderboard"),
+              plotlyOutput("tp_bar", height = "360px"),
+              hr(),
+              h4("Detailed Breakdown"),
+              DTOutput("tp_table")
+            )
+          )
+        )
+      }
+    )
+  ),
+
+  # ── Tab 2: Weekly Scores ──────────────────────────────────────────────────
   tabPanel(
     "Weekly Scores",
     icon = icon("calendar-week"),
     fluidPage(
       fluidRow(
         column(3,
-          wellPanel(
-            selectInput(
-              "ws_season", "Season",
-              choices  = rev(ALL_SEASONS),
-              selected = max(ALL_SEASONS)
-            ),
-            selectInput(
-              "ws_teams", "Teams",
-              choices  = c("All teams" = "all"),
-              selected = "all",
-              multiple = FALSE
-            )
+          selectInput(
+            "ws_season", "Season",
+            choices  = rev(ALL_SEASONS),
+            selected = max(ALL_SEASONS)
           )
         ),
-        column(9,
-          h4("Week-by-Week Scores"),
-          plotlyOutput("ws_chart", height = "360px"),
-          hr(),
+        column(3,
+          selectInput(
+            "ws_teams", "Teams",
+            choices  = c("All teams" = "all"),
+            selected = "all",
+            multiple = FALSE
+          )
+        )
+      ),
+      # Dedicated full-width, tall area for the season-race chart
+      fluidRow(
+        column(12,
+          h4("Season Race — Cumulative Points"),
+          plotlyOutput("ws_chart", height = "620px")
+        )
+      ),
+      hr(),
+      fluidRow(
+        column(12,
           h4("Matchup Results"),
           DTOutput("ws_table")
         )
@@ -38,7 +86,45 @@ ui <- navbarPage(
     )
   ),
 
-  # ── Tab 2: Historical Records ─────────────────────────────────────────────
+  # ── Tab 3: Head-to-Head ───────────────────────────────────────────────────
+  tabPanel(
+    "Head-to-Head",
+    icon = icon("people-arrows"),
+    fluidPage(
+      fluidRow(
+        column(3,
+          wellPanel(
+            radioButtons(
+              "h2h_scope", "Scope",
+              choices  = c("Current season" = "current", "All-time" = "all"),
+              selected = "current"
+            ),
+            selectInput(
+              "h2h_owner", "Owner (for table)",
+              choices  = ALL_OWNERS,
+              selected = ALL_OWNERS[1]
+            ),
+            p(class = "text-muted",
+              "Counts every completed matchup (regular season + playoffs). ",
+              "The manually-run 2016/2017 first-playoff week is excluded.")
+          )
+        ),
+        column(9,
+          h4("Win % Matrix (row owner vs column opponent)"),
+          plotlyOutput("h2h_matrix", height = "560px")
+        )
+      ),
+      hr(),
+      fluidRow(
+        column(12,
+          h4("Head-to-Head Record for Selected Owner"),
+          DTOutput("h2h_table")
+        )
+      )
+    )
+  ),
+
+  # ── Tab 4: Historical Records ─────────────────────────────────────────────
   tabPanel(
     "Historical Records",
     icon = icon("trophy"),
@@ -80,7 +166,7 @@ ui <- navbarPage(
     )
   ),
 
-  # ── Tab 3: Trades ─────────────────────────────────────────────────────────
+  # ── Tab 5: Trades ─────────────────────────────────────────────────────────
   tabPanel(
     "Trades",
     icon = icon("arrows-left-right"),
@@ -139,47 +225,6 @@ ui <- navbarPage(
                 "Trades at the same timestamp are part of the same deal."
               ),
               DTOutput("tr_table")
-            )
-          )
-        )
-      }
-    )
-  ),
-
-  # ── Tab 4: Total Points ───────────────────────────────────────────────────
-  tabPanel(
-    "Total Points",
-    icon = icon("chart-bar"),
-    fluidPage(
-      if (length(STATS_SEASONS) == 0) {
-        fluidRow(
-          column(12,
-            div(
-              class = "alert alert-warning",
-              icon("circle-exclamation"), " ",
-              "Detailed weekly stats are only available from 2018 onward.",
-              " Fallback: season-level Points For from standings is shown below."
-            )
-          )
-        )
-      } else {
-        tagList(
-          fluidRow(
-            column(3,
-              wellPanel(
-                selectInput(
-                  "tp_season", "Season",
-                  choices  = c("All seasons (cumulative)" = "all", rev(STATS_SEASONS)),
-                  selected = "all"
-                )
-              )
-            ),
-            column(9,
-              h4("Points Leaderboard"),
-              plotlyOutput("tp_bar", height = "360px"),
-              hr(),
-              h4("Detailed Breakdown"),
-              DTOutput("tp_table")
             )
           )
         )

@@ -106,26 +106,35 @@ server <- function(input, output, session) {
   # Tab 2: Historical Records
   # ────────────────────────────────────────────────────────────────────────────
 
+  # Championship counts come from the authoritative list (corrections.R), keyed
+  # by owner — so this and the Championship History page can never disagree.
+  champ_counts <- champions_tbl %>%
+    count(owner_key = champion, name = "championships")
+
   alltime_records <- reactive({
+    # Aggregate by OWNER (person), not franchise_id (team slot). This merges an
+    # owner's records across the different slots they held over the years
+    # (e.g. Brent Troop slots 2 & 11) and never merges two people who shared a slot.
     standings_named %>%
-      group_by(franchise_id) %>%
+      filter(!is.na(owner_key)) %>%
+      group_by(owner_key) %>%
       summarise(
-        seasons       = n(),
-        total_wins    = sum(coalesce(h2h_wins,   0L), na.rm = TRUE),
-        total_losses  = sum(coalesce(h2h_losses, 0L), na.rm = TRUE),
-        total_ties    = sum(coalesce(h2h_ties,   0L), na.rm = TRUE),
-        total_pf      = sum(coalesce(points_for,     0), na.rm = TRUE),
-        total_pa      = sum(coalesce(points_against, 0), na.rm = TRUE),
-        championships = sum(coalesce(league_rank == 1L, FALSE), na.rm = TRUE),
-        .groups       = "drop"
+        seasons      = n(),
+        total_wins   = sum(coalesce(h2h_wins,   0L), na.rm = TRUE),
+        total_losses = sum(coalesce(h2h_losses, 0L), na.rm = TRUE),
+        total_ties   = sum(coalesce(h2h_ties,   0L), na.rm = TRUE),
+        total_pf     = sum(coalesce(points_for,     0), na.rm = TRUE),
+        total_pa     = sum(coalesce(points_against, 0), na.rm = TRUE),
+        .groups      = "drop"
       ) %>%
+      left_join(champ_counts, by = "owner_key") %>%
       mutate(
-        total_games = total_wins + total_losses + total_ties,
-        win_pct     = if_else(total_games > 0,
-                              total_wins / total_games, NA_real_)
+        championships = coalesce(championships, 0L),
+        total_games   = total_wins + total_losses + total_ties,
+        win_pct       = if_else(total_games > 0,
+                                total_wins / total_games, NA_real_),
+        display_name  = owner_key
       ) %>%
-      left_join(franchise_canonical %>% select(franchise_id, display_name),
-                by = "franchise_id") %>%
       arrange(desc(total_wins))
   })
 
@@ -171,7 +180,7 @@ server <- function(input, output, session) {
   output$hr_alltime_table <- renderDT({
     at <- alltime_records() %>%
       transmute(
-        Team          = display_name,
+        Owner         = display_name,
         Seasons       = seasons,
         W             = total_wins,
         L             = total_losses,
@@ -189,15 +198,22 @@ server <- function(input, output, session) {
   })
 
   output$hr_champs_table <- renderDT({
-    champs <- standings_named %>%
-      filter(league_rank == 1L) %>%
+    # Authoritative champions (corrections.R). Join that season's team/record
+    # for display; seasons with no data file (e.g. 2013) show blanks.
+    champs <- champions_tbl %>%
+      left_join(
+        standings_named %>%
+          select(season, owner_key, franchise_name, points_for, h2h_wins, h2h_losses),
+        by = c("season", "champion" = "owner_key")
+      ) %>%
       arrange(desc(season)) %>%
       transmute(
         Season       = season,
-        Champion     = coalesce(display_name, franchise_name),
-        `Points For` = fmt_pts(points_for),
-        W            = h2h_wins,
-        L            = h2h_losses
+        Champion     = champion,
+        Team         = franchise_name,
+        Record       = ifelse(is.na(h2h_wins), NA_character_,
+                              paste0(h2h_wins, "-", h2h_losses)),
+        `Points For` = ifelse(is.na(points_for), NA_character_, fmt_pts(points_for))
       )
 
     datatable(champs, rownames = FALSE,
@@ -225,10 +241,16 @@ server <- function(input, output, session) {
   })
 
   output$hr_heatmap <- renderPlotly({
+    # One row per owner (consistent across seasons); order by average finish.
     heat_df <- standings_named %>%
-      mutate(team = coalesce(display_name, franchise_name)) %>%
+      mutate(team = coalesce(owner_key, display_name, franchise_name)) %>%
       filter(!is.na(league_rank), !is.na(team)) %>%
       select(season, team, rank = league_rank)
+
+    owner_order <- heat_df %>%
+      group_by(team) %>% summarise(avg = mean(rank), .groups = "drop") %>%
+      arrange(desc(avg)) %>% pull(team)
+    heat_df <- heat_df %>% mutate(team = factor(team, levels = owner_order))
 
     n_teams <- heat_df %>% pull(rank) %>% max(na.rm = TRUE)
 
@@ -319,7 +341,7 @@ server <- function(input, output, session) {
     }
 
     df %>%
-      group_by(user_name) %>%
+      group_by(owner_key) %>%
       summarise(
         weeks           = n(),
         hitting_points  = sum(coalesce(hitting_points,  0), na.rm = TRUE),
@@ -344,11 +366,11 @@ server <- function(input, output, session) {
         category = recode(category,
                           hitting_points  = "Hitting",
                           pitching_points = "Pitching"),
-        user_name = factor(user_name, levels = rev(df$user_name))
+        owner_key = factor(owner_key, levels = rev(df$owner_key))
       )
 
-    p <- ggplot(bar_df, aes(x = user_name, y = points, fill = category,
-                            text = paste0(user_name, "<br>", category, ": ", round(points, 1)))) +
+    p <- ggplot(bar_df, aes(x = owner_key, y = points, fill = category,
+                            text = paste0(owner_key, "<br>", category, ": ", round(points, 1)))) +
       geom_col() +
       coord_flip() +
       scale_fill_manual(values = c(Hitting = "#2196f3", Pitching = "#ff9800")) +
@@ -364,7 +386,7 @@ server <- function(input, output, session) {
   output$tp_table <- renderDT({
     df <- tp_data() %>%
       transmute(
-        Owner           = user_name,
+        Owner           = owner_key,
         `Total Points`  = fmt_pts(total_points),
         Hitting         = fmt_pts(hitting_points),
         Pitching        = fmt_pts(pitching_points),
@@ -376,5 +398,76 @@ server <- function(input, output, session) {
       df, rownames = FALSE,
       options = list(pageLength = 20, dom = "lrtip")
     )
+  })
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Tab: Head-to-Head
+  # ────────────────────────────────────────────────────────────────────────────
+
+  # Pairwise records between owners. Uses h2h_schedule (owner-keyed; manual
+  # playoff weeks already excluded for 2016/2017). Scope toggles current season
+  # vs all-time.
+  h2h_pairs <- reactive({
+    df <- h2h_schedule %>%
+      filter(!is.na(result), !is.na(owner_key), !is.na(opponent_owner_key),
+             owner_key != opponent_owner_key)
+
+    if (identical(input$h2h_scope, "current")) {
+      df <- df %>% filter(season == max(ALL_SEASONS))
+    }
+
+    df %>%
+      group_by(owner_key, opponent_owner_key) %>%
+      summarise(
+        W = sum(result == "W"),
+        L = sum(result == "L"),
+        T = sum(result == "T"),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        games   = W + L + T,
+        win_pct = if_else(games > 0, (W + 0.5 * T) / games, NA_real_)
+      )
+  })
+
+  output$h2h_matrix <- renderPlotly({
+    d <- h2h_pairs()
+    req(nrow(d) > 0)
+    owners <- sort(unique(c(d$owner_key, d$opponent_owner_key)))
+    d <- d %>%
+      mutate(
+        owner_key          = factor(owner_key,          levels = owners),
+        opponent_owner_key = factor(opponent_owner_key, levels = rev(owners)),
+        rec = paste0(W, "-", L, ifelse(T > 0, paste0("-", T), ""))
+      )
+
+    p <- ggplot(d, aes(x = owner_key, y = opponent_owner_key, fill = win_pct,
+                       text = paste0(owner_key, " vs ", opponent_owner_key,
+                                     "<br>", rec, " (", fmt_pct(win_pct), ")"))) +
+      geom_tile(colour = "white", linewidth = 0.5) +
+      scale_fill_gradient2(low = "#f8d7da", mid = "#ffffff", high = "#d4edda",
+                           midpoint = 0.5, limits = c(0, 1), na.value = "grey92",
+                           name = "Win %") +
+      labs(x = "Owner", y = "Opponent") +
+      theme_minimal(base_size = 11) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.grid = element_blank())
+
+    ggplotly(p, tooltip = "text") %>%
+      layout(hovermode = "closest") %>%
+      config(displayModeBar = FALSE)
+  })
+
+  output$h2h_table <- renderDT({
+    req(input$h2h_owner)
+    d <- h2h_pairs() %>%
+      filter(owner_key == input$h2h_owner) %>%
+      arrange(desc(win_pct), desc(games)) %>%
+      transmute(
+        Opponent = opponent_owner_key,
+        W, L, T,
+        `Win%`   = fmt_pct(win_pct)
+      )
+    datatable(d, rownames = FALSE, options = list(pageLength = 25, dom = "t"))
   })
 }
