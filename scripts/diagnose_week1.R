@@ -58,27 +58,40 @@ if (!is.null(off_days)) {
       "\n\n")
 }
 
-# 3) Per-period point totals — sum the PER-PLAYER appliedStatTotal (player_score),
-#    which is what get_weekly_stats() actually uses and genuinely varies by day.
-#    (franchise_score/totalPoints is the matchup's running CUMULATIVE total and is
-#    identical for every day queried — do not use it here, that was the earlier bug.)
-cat("D) Per scoring period: real per-day production, summed across all players/teams\n")
-cat("   (pre-season days with no MLB games should be ~0; real week-1 days will be large):\n")
+# 3) Per-period STARTER-ONLY point totals — same filter get_weekly_stats() uses
+#    (lineup_slot in hitter/pitcher slots, excludes BE/IL), so these numbers are
+#    directly comparable to the official matchup total in section E.
+.hitter_slots  <- c("C","1B","2B","3B","SS","OF","2B/SS","1B/3B","LF","CF","RF","DH","UTIL","IF")
+.pitcher_slots <- c("SP","RP","P")
+slot_map <- ffscrapr:::.espn_lineupslot_map()
+
+cat("D) Per scoring period: STARTER-ONLY points (matches get_weekly_stats' own filter):\n")
 per <- purrr::map_dfr(sort(gws_days), function(dy) {
   r <- tryCatch(ffscrapr:::.espn_day_roster(dy, WEEK, conn), error = function(e) NULL)
-  pts <- if (is.null(r) || nrow(r) == 0) NA_real_ else sum(r$player_score, na.rm = TRUE)
-  n_nonzero <- if (is.null(r) || nrow(r) == 0) NA_integer_ else sum(r$player_score != 0, na.rm = TRUE)
-  tibble::tibble(scoring_period = dy, total_player_points = round(pts, 1),
-                nonzero_player_rows = n_nonzero)
+  if (is.null(r) || nrow(r) == 0) return(tibble::tibble(scoring_period = dy, starter_points = NA_real_))
+  r <- dplyr::mutate(r, lineup_slot = slot_map[as.character(lineup_id)])
+  pts <- r |> dplyr::filter(lineup_slot %in% c(.hitter_slots, .pitcher_slots)) |>
+    dplyr::pull(player_score) |> sum(na.rm = TRUE)
+  tibble::tibble(scoring_period = dy, starter_points = round(pts, 1))
 })
 print(as.data.frame(per), row.names = FALSE)
 
-# 4) Official week-1 matchup total for reference
+# 4) Official week-1 matchup total for reference (this is what standings/H2H use)
 off_total <- tryCatch({
   ff_schedule(conn) |> dplyr::filter(week == WEEK, !is.na(result)) |>
-    dplyr::summarise(mean = round(mean(franchise_score), 1)) |> dplyr::pull(mean)
+    dplyr::summarise(total = round(sum(franchise_score), 1)) |> dplyr::pull(total)
 }, error = function(e) NA)
-cat("\nE) Official week-1 matchup score, mean/team (from ff_schedule):", off_total, "\n")
-cat("   (get_weekly_stats week-1 mean/team is ~491 — the gap is the pre-season days.)\n")
+cat("\nE) Official week-1 matchup total, ALL teams combined (from ff_schedule):", off_total, "\n")
 
-cat("\n=== Paste sections A–E back so we can set the exact periods to exclude. ===\n")
+# 5) Cumulative sum from each possible starting period through the end — whichever
+#    starting period's cumulative total is closest to E is the true boundary.
+cat("\nF) Cumulative STARTER-ONLY total if week 1 were redefined to start at period X:\n")
+cum <- purrr::map_dfr(sort(gws_days), function(start_dy) {
+  total <- per |> dplyr::filter(scoring_period >= start_dy) |>
+    dplyr::pull(starter_points) |> sum(na.rm = TRUE)
+  tibble::tibble(start_period = start_dy, cumulative_total = round(total, 1),
+                diff_from_official = round(total - off_total, 1))
+})
+print(as.data.frame(cum), row.names = FALSE)
+cat("\n=== The start_period with diff_from_official closest to 0 is the true week-1 start. ===\n")
+cat("=== Paste sections A-F back. ===\n")
