@@ -241,28 +241,39 @@ server <- function(input, output, session) {
   })
 
   output$hr_heatmap <- renderPlotly({
-    # One row per owner (consistent across seasons); order by average finish.
+    # One row per owner (consistent across seasons), best average finish on top.
+    # Each cell prints the finishing rank; colour runs green (1st) -> red (last).
     heat_df <- standings_named %>%
       mutate(team = coalesce(owner_key, display_name, franchise_name)) %>%
-      filter(!is.na(league_rank), !is.na(team)) %>%
+      # rank 0 / NA means the season isn't finalized yet (in-progress) — drop it
+      filter(!is.na(league_rank), league_rank >= 1, !is.na(team)) %>%
       select(season, team, rank = league_rank)
 
     owner_order <- heat_df %>%
       group_by(team) %>% summarise(avg = mean(rank), .groups = "drop") %>%
       arrange(desc(avg)) %>% pull(team)
-    heat_df <- heat_df %>% mutate(team = factor(team, levels = owner_order))
+    heat_df <- heat_df %>%
+      mutate(team = factor(team, levels = owner_order),
+             lbl  = as.character(rank))
 
-    n_teams <- heat_df %>% pull(rank) %>% max(na.rm = TRUE)
+    n_teams <- max(heat_df$rank, na.rm = TRUE)
 
     p <- ggplot(heat_df, aes(x = season, y = team, fill = rank,
-                             text = paste0(team, "<br>", season, ": Rank #", rank))) +
-      geom_tile(colour = "white", linewidth = 0.5) +
-      scale_fill_gradient(low = "#2196f3", high = "#f8d7da",
-                          name = "Final Rank", breaks = seq(1, n_teams)) +
-      scale_x_continuous(breaks = unique(heat_df$season)) +
+                             text = paste0(team, "<br>", season, ": #", rank,
+                                           if_else(rank == 1, " (champion seed)", "")))) +
+      geom_tile(colour = "white", linewidth = 1.1) +
+      geom_text(aes(label = lbl), size = 3.3, colour = "grey15") +
+      scale_fill_gradientn(
+        colours = c("#1a9850", "#91cf60", "#d9ef8b", "#fee08b", "#fc8d59", "#d73027"),
+        limits = c(1, n_teams), name = "Finish",
+        breaks = c(1, n_teams), labels = c("1st", paste0(n_teams, "th"))
+      ) +
+      scale_x_continuous(breaks = unique(heat_df$season), expand = c(0, 0)) +
+      scale_y_discrete(expand = c(0, 0)) +
       labs(x = NULL, y = NULL) +
       theme_minimal(base_size = 12) +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+      theme(axis.text.x = element_text(angle = 0),
+            panel.grid  = element_blank(),
             legend.position = "right")
 
     ggplotly(p, tooltip = "text") %>%

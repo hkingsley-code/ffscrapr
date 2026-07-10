@@ -70,15 +70,27 @@ canon_owner <- function(x) {
   x
 }
 
-# Per (season, franchise_id) → owner identity for that season
+# Per (season, franchise_id) → owner identity for that season.
+# `orig_owner` is ESPN's account owner; `owner_key` applies owner_overrides.
 owner_lookup <- all_franchises %>%
   transmute(
     season,
     franchise_id,
-    owner_key     = canon_owner(coalesce(user_name, franchise_name)),
-    team_name     = franchise_name,
+    orig_owner = canon_owner(coalesce(user_name, franchise_name)),
+    team_name  = franchise_name
+  ) %>%
+  left_join(
+    owner_overrides %>%
+      transmute(season = as.integer(season),
+                franchise_id = as.character(franchise_id),
+                override = canon_owner(owner)),
+    by = c("season", "franchise_id")
+  ) %>%
+  mutate(
+    owner_key     = coalesce(override, orig_owner),
     owner_display = owner_key
-  )
+  ) %>%
+  select(season, franchise_id, owner_key, orig_owner, team_name, owner_display)
 
 # ── Recompute regular-season records for manual-playoff seasons ───────────────
 # For seasons in `playoff_start_week`, ESPN's stored standings are unreliable
@@ -171,10 +183,16 @@ all_schedules <- all_schedules %>%
                                     opponent_owner_key = owner_key),
             by = c("season", "opponent_id" = "franchise_id"))
 
-# Weekly stats carry the owner name already (user_name); canonicalize to owner_key
+# Weekly stats carry the owner name (user_name) but no franchise_id, so map to
+# owner_key via (season, original owner name) — this also applies owner_overrides.
 if (nrow(all_weekly_stats) > 0) {
+  weekly_owner_map <- owner_lookup %>%
+    distinct(season, orig_owner, owner_key)
   all_weekly_stats <- all_weekly_stats %>%
-    mutate(owner_key = canon_owner(user_name))
+    mutate(orig_owner = canon_owner(user_name)) %>%
+    left_join(weekly_owner_map, by = c("season", "orig_owner")) %>%
+    mutate(owner_key = coalesce(owner_key, orig_owner)) %>%
+    select(-orig_owner)
 }
 
 # ── Head-to-head schedule (playoff weeks excluded for manual seasons) ─────────
@@ -189,13 +207,13 @@ h2h_schedule <- all_schedules %>%
 # ── Derived: resolve team / owner names for display ──────────────────────────
 
 # Per-season name lookup (used to show names as they were in each season).
-# Owner display is canonicalized (e.g. "Nicholas Gardner" -> "Nick Gardner") so
+# display_name is the (canonicalized, override-aware) owner from owner_lookup so
 # a person reads the same everywhere; the season's team name is preserved as-is.
 franchise_season_lookup <- all_franchises %>%
-  select(season, franchise_id,
-         franchise_name,
-         display_name = user_name) %>%
-  mutate(display_name = canon_owner(coalesce(display_name, franchise_name)))
+  select(season, franchise_id, franchise_name) %>%
+  left_join(owner_lookup %>% select(season, franchise_id, display_name = owner_key),
+            by = c("season", "franchise_id")) %>%
+  mutate(display_name = coalesce(display_name, franchise_name))
 
 # Canonical owner display (used for cross-season labels)
 owner_display_lookup <- owner_lookup %>%

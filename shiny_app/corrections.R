@@ -38,6 +38,16 @@ champions <- tibble::tribble(
   # 2026 in progress — no champion yet, intentionally omitted
 )
 
+# ── Owner overrides ──────────────────────────────────────────────────────────
+# When ESPN's account owner for a team slot in a given season isn't who actually
+# ran the team. Keyed by (season, franchise_id); the owner name is canonicalized
+# and used everywhere that team's records/points/H2H are attributed.
+owner_overrides <- tibble::tribble(
+  ~season, ~franchise_id, ~owner,
+  2018L,   "1",           "Peyton Lurk",   # ESPN shows Harris Kingsley's account
+  2019L,   "1",           "Peyton Lurk"
+)
+
 # ── Playoff structure overrides ──────────────────────────────────────────────
 # Some seasons the league manually made the last "regular season" week the first
 # playoff round. Weeks >= `week` here are playoffs and are EXCLUDED when

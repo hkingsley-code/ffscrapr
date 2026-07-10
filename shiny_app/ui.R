@@ -160,7 +160,7 @@ ui <- navbarPage(
         ),
         tabPanel("Standings Over Time",
           br(),
-          plotlyOutput("hr_heatmap", height = "420px")
+          plotlyOutput("hr_heatmap", height = "680px")
         )
       )
     )
