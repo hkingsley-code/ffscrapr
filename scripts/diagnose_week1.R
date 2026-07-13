@@ -130,3 +130,35 @@ g_tbl <- fr |>
 print(as.data.frame(g_tbl[, c("user_name", "recomputed", "official", "diff")]), row.names = FALSE)
 
 cat("\n=== Paste sections A-G back. ===\n")
+
+# 7) Drill down into the flagged team's day-by-day starter roster (periods >= BOUNDARY)
+#    to find the specific player/day causing the residual.
+FLAG_USER <- g_tbl$user_name[which.max(abs(g_tbl$diff))]
+flag_franchise_id <- g_tbl$franchise_id[g_tbl$user_name == FLAG_USER][1]
+if (!"franchise_id" %in% names(g_tbl)) flag_franchise_id <- fr$franchise_id[fr$user_name == FLAG_USER][1]
+
+cat("\nH) Day-by-day STARTER roster for", FLAG_USER, "(franchise_id", flag_franchise_id,
+    ") across periods >=", BOUNDARY, ":\n")
+h_tbl <- purrr::map_dfr(sort(gws_days[gws_days >= BOUNDARY]), function(dy) {
+  r <- tryCatch(ffscrapr:::.espn_day_roster(dy, WEEK, conn), error = function(e) NULL)
+  if (is.null(r) || nrow(r) == 0) return(tibble::tibble())
+  r <- dplyr::mutate(r,
+    franchise_id = as.character(franchise_id),
+    lineup_slot  = slot_map[as.character(lineup_id)]
+  )
+  r |>
+    dplyr::filter(franchise_id == flag_franchise_id, lineup_slot %in% c(.hitter_slots, .pitcher_slots)) |>
+    dplyr::mutate(scoring_period = dy) |>
+    dplyr::select(scoring_period, player_id, player_name, lineup_slot, player_score)
+})
+print(as.data.frame(h_tbl |> dplyr::arrange(player_id, scoring_period)), row.names = FALSE)
+
+cat("\nI) Same player appearing on MULTIPLE days with an IDENTICAL score (possible duplicate/stale read):\n")
+dupe_check <- h_tbl |>
+  dplyr::group_by(player_id, player_name, player_score) |>
+  dplyr::summarise(n_days = dplyr::n(), days = paste(scoring_period, collapse=","), .groups = "drop") |>
+  dplyr::filter(n_days > 1) |>
+  dplyr::arrange(dplyr::desc(player_score))
+print(as.data.frame(dupe_check), row.names = FALSE)
+
+cat("\n=== Paste sections H-I back too. ===\n")
