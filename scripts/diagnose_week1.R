@@ -94,4 +94,39 @@ cum <- purrr::map_dfr(sort(gws_days), function(start_dy) {
 })
 print(as.data.frame(cum), row.names = FALSE)
 cat("\n=== The start_period with diff_from_official closest to 0 is the true week-1 start. ===\n")
-cat("=== Paste sections A-F back. ===\n")
+
+# 6) PER-TEAM breakdown at the chosen boundary (periods 6:12) vs each team's own
+#    official week-1 score — pinpoints whether any residual concentrates on one team.
+BOUNDARY <- 6L
+cat("\nG) Per-team STARTER-ONLY total for periods >=", BOUNDARY,
+    "vs each team's own official week-1 score:\n")
+fr <- ff_franchises(conn) |>
+  dplyr::mutate(franchise_id = as.character(franchise_id)) |>
+  dplyr::select(franchise_id, user_name, franchise_name)
+
+per_team_recompute <- purrr::map_dfr(sort(gws_days[gws_days >= BOUNDARY]), function(dy) {
+  r <- tryCatch(ffscrapr:::.espn_day_roster(dy, WEEK, conn), error = function(e) NULL)
+  if (is.null(r) || nrow(r) == 0) return(tibble::tibble())
+  r <- dplyr::mutate(r,
+    franchise_id = as.character(franchise_id),
+    lineup_slot  = slot_map[as.character(lineup_id)]
+  )
+  r |> dplyr::filter(lineup_slot %in% c(.hitter_slots, .pitcher_slots)) |>
+    dplyr::select(franchise_id, player_score)
+}) |>
+  dplyr::group_by(franchise_id) |>
+  dplyr::summarise(recomputed = round(sum(player_score, na.rm = TRUE), 1), .groups = "drop")
+
+official_per_team <- ff_schedule(conn) |>
+  dplyr::filter(week == WEEK, !is.na(result)) |>
+  dplyr::mutate(franchise_id = as.character(franchise_id)) |>
+  dplyr::select(franchise_id, official = franchise_score)
+
+g_tbl <- fr |>
+  dplyr::left_join(per_team_recompute, by = "franchise_id") |>
+  dplyr::left_join(official_per_team,  by = "franchise_id") |>
+  dplyr::mutate(diff = round(recomputed - official, 1)) |>
+  dplyr::arrange(dplyr::desc(abs(diff)))
+print(as.data.frame(g_tbl[, c("user_name", "recomputed", "official", "diff")]), row.names = FALSE)
+
+cat("\n=== Paste sections A-G back. ===\n")
