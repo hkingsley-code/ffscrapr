@@ -481,4 +481,90 @@ server <- function(input, output, session) {
       )
     datatable(d, rownames = FALSE, options = list(pageLength = 25, dom = "t"))
   })
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Tab: Playoff Odds
+  # ────────────────────────────────────────────────────────────────────────────
+  # SIM_RESULT / current_standings are computed once at app startup in global.R
+  # (not per-session) — see the "Playoff/relegation odds" section there.
+
+  output$po_standings_table <- renderDT({
+    req(current_standings)
+    df <- current_standings %>%
+      filter(!is.na(division_name)) %>%
+      arrange(
+        division_name,
+        desc(coalesce(h2h_wins, 0L) + 0.5 * coalesce(h2h_ties, 0L)),
+        desc(points_for)
+      ) %>%
+      transmute(
+        Division     = division_name,
+        Team         = coalesce(display_name, franchise_name),
+        W            = coalesce(h2h_wins, 0L),
+        L            = coalesce(h2h_losses, 0L),
+        T            = coalesce(h2h_ties, 0L),
+        `Points For` = fmt_pts(points_for)
+      )
+    datatable(df, rownames = FALSE, options = list(pageLength = 12, dom = "t"))
+  })
+
+  output$po_odds_table <- renderDT({
+    req(SIM_RESULT)
+    df <- SIM_RESULT$team_odds %>%
+      transmute(
+        Team          = team,
+        Division      = division_name,
+        Record        = paste0(current_wins, "-", current_losses,
+                               if_else(current_ties > 0, paste0("-", current_ties), "")),
+        `Points For`  = fmt_pts(current_pf),
+        `Playoff %`   = fmt_pct(playoff_pct),
+        `Bye %`       = fmt_pct(bye_pct),
+        `Seed 1`      = fmt_pct(seed_1_pct),
+        `Seed 2`      = fmt_pct(seed_2_pct),
+        `Seed 3`      = fmt_pct(seed_3_pct),
+        `Seed 4`      = fmt_pct(seed_4_pct),
+        `Seed 5`      = fmt_pct(seed_5_pct),
+        `Seed 6`      = fmt_pct(seed_6_pct),
+        `Relegated %` = fmt_pct(relegated_pct),
+        `Promoted %`  = fmt_pct(promoted_pct)
+      )
+    datatable(df, rownames = FALSE, options = list(pageLength = 12, dom = "t", scrollX = TRUE))
+  })
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Tab: Keeper Prices
+  # ────────────────────────────────────────────────────────────────────────────
+  # KEEPER_TABLE is computed once at app startup in global.R — see the "Keeper
+  # prices for next season" section there.
+
+  output$kp_table <- renderDT({
+    req(nrow(KEEPER_TABLE) > 0)
+    df <- KEEPER_TABLE
+
+    if (!is.null(input$kp_team) && input$kp_team != "all") {
+      df <- df %>% filter(franchise_name == input$kp_team)
+    }
+    if (!is.null(input$kp_player) && nchar(input$kp_player) > 0) {
+      search_str <- tolower(trimws(input$kp_player))
+      df <- df %>% filter(grepl(search_str, tolower(coalesce(player_name, "")), fixed = TRUE))
+    }
+
+    df <- df %>%
+      transmute(
+        Player         = player_name,
+        Position       = pos,
+        `MLB Team`     = team,
+        `Fantasy Team` = franchise_name,
+        `This Season`  = draft_price,
+        `Was Keeper?`  = if_else(is_keeper, "Yes", "No"),
+        `Next Season`  = next_season_price,
+        Source         = price_source
+      )
+
+    datatable(
+      df, rownames = FALSE, filter = "top",
+      options = list(pageLength = 25, dom = "lrtip")
+    ) %>%
+      formatCurrency(c("This Season", "Next Season"), currency = "$", digits = 0)
+  })
 }

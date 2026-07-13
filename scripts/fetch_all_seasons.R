@@ -247,6 +247,25 @@ fetch_season <- function(season) {
     NULL
   }
 
+  # Auction draft results (bid_amount, is_keeper) — needed for keeper-price calcs
+  draft <- tryCatch({
+    message("  fetching ff_draft()...")
+    ff_draft(conn)
+  }, error = function(e) {
+    message("  WARN: ff_draft() — ", conditionMessage(e))
+    NULL
+  })
+
+  # Current roster (attributes players to their CURRENT team for keeper calcs,
+  # accounting for in-season trades/waiver moves the draft table won't reflect)
+  rosters <- tryCatch({
+    message("  fetching ff_rosters()...")
+    ff_rosters(conn)
+  }, error = function(e) {
+    message("  WARN: ff_rosters() — ", conditionMessage(e))
+    NULL
+  })
+
   out <- list(
     season       = season,
     league       = league,
@@ -254,7 +273,9 @@ fetch_season <- function(season) {
     schedule     = schedule,
     standings    = standings,
     weekly_stats = weekly_stats,
-    transactions = transactions
+    transactions = transactions,
+    draft        = draft,
+    rosters      = rosters
   )
 
   path <- file.path(DATA_DIR, paste0("season_", season, ".rds"))

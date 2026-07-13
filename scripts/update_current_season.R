@@ -116,6 +116,9 @@ transactions <- tryCatch({
   if (!is.null(txn) && nrow(txn) > 0) filter(txn, type == "TRADE") else NULL
 }, error = function(e) { log("ff_transactions: ", conditionMessage(e)); NULL })
 
+draft   <- tryCatch(ff_draft(conn),   error = function(e) { log("ff_draft: ",   conditionMessage(e)); NULL })
+rosters <- tryCatch(ff_rosters(conn), error = function(e) { log("ff_rosters: ", conditionMessage(e)); NULL })
+
 # Guard: don't overwrite good data with an empty/broken pull
 if (is.null(schedule) || nrow(schedule) == 0) {
   log("Schedule came back empty — refusing to overwrite existing data. Aborting.")
@@ -125,7 +128,8 @@ if (is.null(schedule) || nrow(schedule) == 0) {
 out <- list(
   season = SEASON, league = league, franchises = franchises,
   schedule = schedule, standings = standings,
-  weekly_stats = weekly_stats, transactions = transactions
+  weekly_stats = weekly_stats, transactions = transactions,
+  draft = draft, rosters = rosters
 )
 path <- file.path(DATA_DIR, paste0("season_", SEASON, ".rds"))
 saveRDS(out, path)

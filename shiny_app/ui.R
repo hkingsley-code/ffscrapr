@@ -166,6 +166,102 @@ ui <- navbarPage(
     )
   ),
 
+  # ── Tab: Playoff Odds ────────────────────────────────────────────────────
+  tabPanel(
+    "Playoff Odds",
+    icon = icon("chart-line"),
+    fluidPage(
+      if (is.null(SIM_RESULT)) {
+        fluidRow(
+          column(12,
+            div(
+              class = "alert alert-warning",
+              icon("circle-exclamation"), " ",
+              strong("Playoff odds aren't available yet."),
+              " This needs division data from ESPN, added via a package update — ",
+              "re-run ", code("scripts/update_current_season.R"),
+              " after installing the latest ", code("ffscrapr"), " dev version ",
+              "(", code("devtools::install('.')"), ") to populate it."
+            )
+          )
+        )
+      } else {
+        tagList(
+          fluidRow(
+            column(12,
+              div(class = "alert alert-info", icon("circle-info"), " ", SIM_RESULT$methodology)
+            )
+          ),
+          fluidRow(
+            column(12,
+              h4("Current Division Standings"),
+              DTOutput("po_standings_table")
+            )
+          ),
+          hr(),
+          fluidRow(
+            column(12,
+              h4("Playoff, Seeding & Relegation Odds"),
+              p(class = "text-muted",
+                "Seed 1 = Alpha's #1 team (bye). Seed 2 = Beta's #1 team (bye). ",
+                "Seeds 3-6 and the wildcard are determined strictly by total season ",
+                "points, not wins. Relegated/Promoted % reflects next season's ",
+                "division swap: bottom 2 Alpha ↔ top 2 Beta by record."),
+              DTOutput("po_odds_table")
+            )
+          )
+        )
+      }
+    )
+  ),
+
+  # ── Tab: Keeper Prices ───────────────────────────────────────────────────
+  tabPanel(
+    "Keeper Prices",
+    icon = icon("dollar-sign"),
+    fluidPage(
+      if (nrow(KEEPER_TABLE) == 0) {
+        fluidRow(
+          column(12,
+            div(
+              class = "alert alert-warning",
+              icon("circle-exclamation"), " ",
+              strong("Keeper prices aren't available yet."),
+              " This needs draft + roster data for the current season — re-run ",
+              code("scripts/update_current_season.R"),
+              " after installing the latest ", code("ffscrapr"), " dev version ",
+              "(", code("devtools::install('.')"), ") to populate it."
+            )
+          )
+        )
+      } else {
+        tagList(
+          fluidRow(
+            column(3,
+              wellPanel(
+                selectInput(
+                  "kp_team", "Team",
+                  choices  = c("All teams" = "all", sort(unique(KEEPER_TABLE$franchise_name))),
+                  selected = "all"
+                ),
+                textInput("kp_player", "Player name search", placeholder = "e.g. Judge")
+              )
+            ),
+            column(9,
+              h4("Next-Season Keeper Prices"),
+              p(class = "text-muted",
+                "Price = max(this year's draft price, $10), or draft price × 1.5 ",
+                "(rounded up) if already a keeper this season. Rows marked ",
+                "\"waiver-default\" had no draft record this season (in-season ",
+                "pickups) and default to $10 unless corrected in corrections.R."),
+              DTOutput("kp_table")
+            )
+          )
+        )
+      }
+    )
+  ),
+
   # ── Tab 5: Trades ─────────────────────────────────────────────────────────
   tabPanel(
     "Trades",

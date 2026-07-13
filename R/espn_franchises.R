@@ -74,9 +74,12 @@ ff_franchises.espn_conn <- function(conn) {
       "franchise_nickname" = "nickname",
       "logo"               = "logo",
       "waiver_order"       = "waiverRank",
-      "user_id"            = "primaryOwner"
+      "user_id"            = "primaryOwner",
+      "division_id"        = "divisionId"
     ) %>%
     dplyr::left_join(members, by = "user_id") %>%
+    dplyr::mutate(division_id = as.character(.data$division_id)) %>%
+    dplyr::left_join(.espn_divisions(conn), by = "division_id") %>%
     dplyr::mutate(
       franchise_name = dplyr::coalesce(
         .data$franchise_name,
@@ -91,8 +94,47 @@ ff_franchises.espn_conn <- function(conn) {
       "waiver_order",
       "user_id",
       "user_name",
-      "user_nickname"
+      "user_nickname",
+      "division_id",
+      "division_name"
     )))
 
   return(teams)
+}
+
+#' Get division id/name lookup for a league (ESPN)
+#'
+#' Divisions live under the `mSettings` view, separately from the `mTeam` view
+#' that carries each team's `divisionId` - so this is fetched as its own call
+#' and left-joined onto franchises, rather than requesting both views at once
+#' (the ESPN API can behave inconsistently when views are combined).
+#'
+#' @param conn a conn object created by `ff_connect()`
+#' @noRd
+.espn_divisions <- function(conn) {
+  empty <- tibble::tibble(
+    division_id   = character(0),
+    division_name = character(0)
+  )
+
+  settings_endpoint <- tryCatch(
+    espn_getendpoint(conn, view = "mSettings") %>% purrr::pluck("content"),
+    error = function(e) NULL
+  )
+
+  divisions_raw <- purrr::pluck(settings_endpoint, "settings", "scheduleSettings", "divisions")
+
+  if (is.null(divisions_raw) || length(divisions_raw) == 0) {
+    return(empty)
+  }
+
+  divisions_raw %>%
+    tibble::tibble() %>%
+    tidyr::hoist(
+      .col = 1,
+      "division_id"   = "id",
+      "division_name" = "name"
+    ) %>%
+    dplyr::mutate(division_id = as.character(.data$division_id)) %>%
+    dplyr::select("division_id", "division_name")
 }

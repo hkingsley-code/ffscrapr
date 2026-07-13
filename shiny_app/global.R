@@ -15,6 +15,10 @@ suppressPackageStartupMessages({
 # Hand-maintained corrections (champions, playoff weeks, name aliases)
 source("corrections.R", local = FALSE)
 
+# Playoff/relegation Monte Carlo simulation + keeper price computation
+source("simulate_playoffs.R", local = FALSE)
+source("keeper_prices.R", local = FALSE)
+
 DATA_DIR <- file.path(getwd(), "data")
 
 # ── Load and combine all season .rds files ───────────────────────────────────
@@ -44,6 +48,8 @@ all_schedules    <- bind_season_element(season_list, "schedule")
 all_standings    <- bind_season_element(season_list, "standings")
 all_weekly_stats <- bind_season_element(season_list, "weekly_stats")
 all_transactions <- bind_season_element(season_list, "transactions")
+all_draft        <- bind_season_element(season_list, "draft")
+all_rosters      <- bind_season_element(season_list, "rosters")
 
 # Normalise franchise_id to character for consistent joining
 all_franchises   <- mutate(all_franchises,   franchise_id = as.character(franchise_id))
@@ -55,6 +61,13 @@ if (nrow(all_transactions) > 0) {
   all_transactions <- mutate(all_transactions,
                              franchise_id  = as.character(franchise_id),
                              trade_partner = as.character(trade_partner))
+}
+
+if (nrow(all_draft) > 0) {
+  all_draft <- mutate(all_draft, franchise_id = as.character(franchise_id))
+}
+if (nrow(all_rosters) > 0) {
+  all_rosters <- mutate(all_rosters, franchise_id = as.character(franchise_id))
 }
 
 # ── Owner identity ───────────────────────────────────────────────────────────
@@ -291,3 +304,49 @@ ALL_TEAMS <- franchise_canonical %>%
   arrange(display_name) %>%
   pull(display_name) %>%
   unique()
+
+# ── Playoff/relegation odds (current season only) ────────────────────────────
+# Computed once at app startup, not per-session — a 10,000-trial simulation
+# shouldn't re-run for every visitor. Requires division_id/division_name from
+# ff_franchises()/ff_standings() (see R/espn_franchises.R's .espn_divisions())
+# for the current season's data; if that season's .rds predates the division
+# fields (needs a re-run of scripts/update_current_season.R), this degrades to
+# NULL and the Playoff Odds tab shows a message instead of erroring the app.
+CURRENT_SEASON <- max(ALL_SEASONS)
+
+current_standings <- standings_named %>%
+  filter(season == CURRENT_SEASON)
+
+SIM_RESULT <- tryCatch(
+  simulate_season(
+    schedule_df  = all_schedules %>% filter(season == CURRENT_SEASON),
+    standings_df = current_standings,
+    n_trials     = 10000,
+    seed         = 20260713
+  ),
+  error = function(e) {
+    message("SIM_RESULT unavailable: ", conditionMessage(e))
+    NULL
+  }
+)
+
+# ── Keeper prices for next season (current season only) ──────────────────────
+# Requires ff_draft()/ff_rosters() to have been fetched for the current season
+# (see scripts/update_current_season.R); degrades to an empty table otherwise.
+# (all_draft/all_rosters can be a 0-column empty tibble if NO cached season has
+# this data yet — filtering by `season` on that would error, so guard on nrow()
+# first, mirroring how all_transactions/HAS_TRADE_DATA is guarded above.)
+HAS_DRAFT_DATA   <- nrow(all_draft) > 0   && CURRENT_SEASON %in% all_draft$season
+HAS_ROSTER_DATA  <- nrow(all_rosters) > 0 && CURRENT_SEASON %in% all_rosters$season
+
+KEEPER_TABLE <- tryCatch(
+  compute_keeper_prices(
+    draft_df     = if (HAS_DRAFT_DATA)  filter(all_draft,   season == CURRENT_SEASON) else NULL,
+    roster_df    = if (HAS_ROSTER_DATA) filter(all_rosters, season == CURRENT_SEASON) else NULL,
+    overrides_df = filter(keeper_price_overrides, season == CURRENT_SEASON)
+  ),
+  error = function(e) {
+    message("KEEPER_TABLE unavailable: ", conditionMessage(e))
+    compute_keeper_prices(NULL, NULL, NULL)
+  }
+)

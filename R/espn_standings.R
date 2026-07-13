@@ -73,7 +73,9 @@ ff_standings.espn_conn <- function(conn, ...) {
     .add_allplay()
 
   franchise_names <- ff_franchises(conn) %>%
-    dplyr::select("franchise_id", "franchise_name")
+    dplyr::select(dplyr::any_of(c(
+      "franchise_id", "franchise_name", "division_id", "division_name"
+    )))
 
   standings <-
     dplyr::bind_cols(

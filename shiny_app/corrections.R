@@ -58,3 +58,16 @@ playoff_start_week <- tibble::tribble(
   2016L,   20L,
   2017L,   20L
 )
+
+# ── Keeper price overrides ────────────────────────────────────────────────────
+# Next-season keeper prices are computed automatically (see keeper_prices.R):
+# max(draft price, $10), or draft price * 1.5 rounded up if already a keeper.
+# Use this to hand-correct specific players — mirrors the league's own keeper
+# spreadsheet, which has a manual "adjustment" column for the same purpose
+# (e.g. a price renegotiated as part of a trade). Keyed by (season, player_id)
+# since player_id is stable across trades; player_name is a comment only, not
+# joined on.
+keeper_price_overrides <- tibble::tribble(
+  ~season, ~player_id, ~player_name,  ~override_price, ~note
+  # 2026L, 12345,      "Aaron Judge", 65,              "Trade adjustment per league sheet"
+)
