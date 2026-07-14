@@ -68,6 +68,16 @@ playoff_start_week <- tibble::tribble(
 # since player_id is stable across trades; player_name is a comment only, not
 # joined on.
 keeper_price_overrides <- tibble::tribble(
-  ~season, ~player_id, ~player_name,  ~override_price, ~note
-  # 2026L, 12345,      "Aaron Judge", 65,              "Trade adjustment per league sheet"
+  ~season, ~player_id, ~player_name,       ~override_price, ~note,
+  # These 5 escalate from a lower ESPN-recorded bid_amount than the league's
+  # keeper sheet uses (each player's price was reduced via a trade this
+  # season; the sheet's 2027 price still escalates from the PRE-trade price,
+  # not the post-trade bid ESPN's draft record shows). Reconciled against the
+  # league's keeper spreadsheet 2027 Price column on 2026-07-14 — see that
+  # sheet for the authoritative numbers if this ever needs re-checking.
+  2026L,   4730225,    "Mason Miller",      23,              "Sheet 2027 price; escalates from pre-trade $15, not ESPN's post-trade $4 bid",
+  2026L,   38303,      "David Bednar",      15,              "Sheet 2027 price; escalates from pre-trade $10, not ESPN's post-trade $5 bid",
+  2026L,   33192,      "Aaron Judge",       113,             "Sheet 2027 price; escalates from pre-trade $75, not ESPN's post-trade $65 bid",
+  2026L,   41179,      "Brice Turang",      15,              "Sheet 2027 price; escalates from pre-trade $10, not ESPN's post-trade $21 bid",
+  2026L,   39667,      "Jesus Luzardo",     15,              "Sheet 2027 price; escalates from pre-trade $10, not ESPN's post-trade $25 bid"
 )
