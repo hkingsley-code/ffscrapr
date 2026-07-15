@@ -33,8 +33,14 @@
 #'   division_id, division_name, h2h_wins, h2h_losses, h2h_ties, points_for
 #' @param n_trials number of Monte Carlo trials
 #' @param seed optional RNG seed for reproducibility
+#' @param forced_winners character vector of franchise_ids forced to win
+#'   their current-week remaining matchup (used for the "what if" UI). A team
+#'   appears in at most one remaining current-week matchup, so specifying
+#'   winners is sufficient — the named team's opponent is implicitly forced
+#'   to lose. A franchise_id not present in any remaining matchup is a no-op.
 #' @noRd
-simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = NULL) {
+simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = NULL,
+                             forced_winners = character(0)) {
   if (!is.null(seed)) set.seed(seed)
 
   teams_df <- standings_df %>%
@@ -138,6 +144,32 @@ simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = 
   n_matchups <- nrow(remaining)
   if (n_matchups == 0) n_trials <- 1L  # nothing left to simulate — one deterministic "trial"
 
+  # ---- current (nearest upcoming) week's matchups, for the "what if" UI ----
+  current_week_matchups <- if (n_matchups > 0) {
+    cw_week <- min(remaining$week)
+    remaining %>%
+      dplyr::filter(.data$week == cw_week) %>%
+      dplyr::left_join(
+        teams_df %>% dplyr::transmute(
+          team_a = .data$franchise_id,
+          team_a_name = dplyr::coalesce(.data$display_name, .data$franchise_name)
+        ),
+        by = "team_a"
+      ) %>%
+      dplyr::left_join(
+        teams_df %>% dplyr::transmute(
+          team_b = .data$franchise_id,
+          team_b_name = dplyr::coalesce(.data$display_name, .data$franchise_name)
+        ),
+        by = "team_b"
+      )
+  } else {
+    tibble::tibble(
+      week = integer(0), team_a = character(0), team_b = character(0),
+      team_a_name = character(0), team_b_name = character(0)
+    )
+  }
+
   # ---- simulate scores for remaining matchups (vectorized) -----------------
   inc_wins_mat   <- matrix(0L, nrow = n_trials, ncol = n_teams, dimnames = list(NULL, team_ids))
   inc_losses_mat <- matrix(0L, nrow = n_trials, ncol = n_teams, dimnames = list(NULL, team_ids))
@@ -158,6 +190,18 @@ simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = 
       nrow = n_trials, ncol = n_matchups
     )
     a_wins <- score_a > score_b
+
+    # Force specific matchups' win/loss for the "what if" UI, without
+    # touching the underlying score draws — points_for (which still drives
+    # wildcard/seed 3-6 selection) stays realistically variable even for a
+    # forced-outcome matchup. A team appears in at most one remaining
+    # matchup, so forced_a/forced_b can never both be TRUE for the same m.
+    if (length(forced_winners) > 0) {
+      forced_a <- remaining$team_a %in% forced_winners
+      forced_b <- remaining$team_b %in% forced_winners
+      a_wins[, forced_a] <- TRUE
+      a_wins[, forced_b] <- FALSE
+    }
 
     for (m in seq_len(n_matchups)) {
       a <- remaining$team_a[m]; b <- remaining$team_b[m]
@@ -281,6 +325,7 @@ simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = 
   list(
     n_trials    = n_trials,
     team_odds   = team_odds,
+    current_week_matchups = current_week_matchups,
     methodology = paste0(
       n_trials, " Monte Carlo trials. Each remaining matchup draws a score for ",
       "each team from a normal distribution fit to that team's own weekly scores ",

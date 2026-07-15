@@ -330,6 +330,12 @@ SIM_RESULT <- tryCatch(
   }
 )
 
+# Trial count for the interactive "What If" panel's per-session reactive
+# recompute (see server.R). Measured at ~13-17s per call at 10,000 trials —
+# unusable for a per-click reactive — vs. ~1.7s at 1,000 trials, which is an
+# acceptable responsiveness/precision trade-off for an exploratory tool.
+WHATIF_N_TRIALS <- 1000
+
 # ── Keeper prices for next season (current season only) ──────────────────────
 # Requires ff_draft()/ff_rosters() to have been fetched for the current season
 # (see scripts/update_current_season.R); degrades to an empty table otherwise.

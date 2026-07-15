@@ -487,6 +487,48 @@ server <- function(input, output, session) {
   # ────────────────────────────────────────────────────────────────────────────
   # SIM_RESULT / current_standings are computed once at app startup in global.R
   # (not per-session) — see the "Playoff/relegation odds" section there.
+  # The "What If" panel is per-session: picking outcomes for this week's
+  # matchups re-runs simulate_season() with those outcomes forced, so the
+  # whole team_odds table (all teams, not just the two in a toggled game)
+  # reflects the hypothetical. Re-simulating (rather than filtering the
+  # existing 10,000 baseline trials post-hoc) keeps full statistical power
+  # regardless of how many of the week's games are set at once — see
+  # simulate_playoffs.R's forced_winners parameter.
+
+  po_forced_winners_raw <- reactive({
+    mu <- SIM_RESULT$current_week_matchups
+    if (is.null(mu) || nrow(mu) == 0) return(character(0))
+    picks <- map_chr(seq_len(nrow(mu)), function(i) {
+      id  <- paste0("mu_", mu$team_a[i], "_", mu$team_b[i])
+      val <- input[[id]]
+      if (is.null(val)) "sim" else val
+    })
+    picks[picks != "sim"]
+  })
+  po_forced_winners <- debounce(po_forced_winners_raw, millis = 400)
+
+  po_whatif_result <- reactive({
+    fw <- po_forced_winners()
+    if (length(fw) == 0) return(SIM_RESULT)  # no toggles set — reuse baseline, skip recompute
+    withProgress(message = "Recalculating odds...", {
+      simulate_season(
+        schedule_df    = all_schedules %>% filter(season == CURRENT_SEASON),
+        standings_df   = current_standings,
+        n_trials       = WHATIF_N_TRIALS,
+        seed           = 20260713,
+        forced_winners = fw
+      )
+    })
+  })
+
+  observeEvent(input$po_reset_whatif, {
+    mu <- SIM_RESULT$current_week_matchups
+    if (is.null(mu) || nrow(mu) == 0) return()
+    walk(seq_len(nrow(mu)), function(i) {
+      id <- paste0("mu_", mu$team_a[i], "_", mu$team_b[i])
+      updateRadioButtons(session, id, selected = "sim")
+    })
+  })
 
   output$po_standings_table <- renderDT({
     req(current_standings)
@@ -509,8 +551,8 @@ server <- function(input, output, session) {
   })
 
   output$po_odds_table <- renderDT({
-    req(SIM_RESULT)
-    df <- SIM_RESULT$team_odds %>%
+    req(po_whatif_result())
+    df <- po_whatif_result()$team_odds %>%
       transmute(
         Team          = team,
         Division      = division_name,

@@ -192,6 +192,42 @@ ui <- navbarPage(
               div(class = "alert alert-info", icon("circle-info"), " ", SIM_RESULT$methodology)
             )
           ),
+          if (nrow(SIM_RESULT$current_week_matchups) > 0) {
+            fluidRow(
+              column(12,
+                wellPanel(
+                  h4(paste0(
+                    "What If? — Week ", min(SIM_RESULT$current_week_matchups$week),
+                    " Outcomes"
+                  )),
+                  p(class = "text-muted",
+                    "Pick a winner for any of this week's games to see how it reshapes ",
+                    "the whole league's odds below — not just the two teams in that ",
+                    "game, since standings, wildcard, and seeding are all interdependent. ",
+                    "Uses ", WHATIF_N_TRIALS, " trials for responsiveness (vs. ",
+                    SIM_RESULT$n_trials, " for the baseline odds), so hypothetical numbers ",
+                    "are a bit noisier than usual."),
+                  fluidRow(
+                    purrr::map(seq_len(nrow(SIM_RESULT$current_week_matchups)), function(i) {
+                      mu <- SIM_RESULT$current_week_matchups[i, ]
+                      column(4,
+                        strong(paste(mu$team_a_name, "vs", mu$team_b_name)),
+                        radioButtons(
+                          inputId      = paste0("mu_", mu$team_a, "_", mu$team_b),
+                          label        = NULL,
+                          choiceNames  = list("Simulate", paste(mu$team_a_name, "wins"),
+                                               paste(mu$team_b_name, "wins")),
+                          choiceValues = list("sim", mu$team_a, mu$team_b),
+                          selected     = "sim"
+                        )
+                      )
+                    })
+                  ),
+                  actionButton("po_reset_whatif", "Reset to Simulated", icon = icon("rotate-left"))
+                )
+              )
+            )
+          },
           fluidRow(
             column(12,
               h4("Current Division Standings"),
