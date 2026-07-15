@@ -40,20 +40,53 @@ ff_schedule.espn_conn <- function(conn, ...) {
   # h_score <- h %>% .pluck_team_score()
   # a_score <- a %>% .pluck_team_score()
 
-  # Not sure if I should use the "winner" field or just manually calculate the result later.
-  # There could be differences with how games that are yet-to-be-completed are treated.
+  # ESPN's own "winner" field is HOME/AWAY/TIE once a matchup period is
+  # finalized, and UNDECIDED while it's still in progress (or hasn't started —
+  # both cases show live/partial or zero totalPoints). Deriving `result` from
+  # `winner` (rather than just comparing totalPoints) is required: a matchup
+  # period can be mid-week with real, nonzero partial scores on both sides,
+  # which a naive score comparison would misread as a final result days
+  # before ESPN itself considers the week over.
   scores <-
     tibble::tibble(
       "week" = schedule %>% purrr::map_int(~ purrr::pluck(.x, "matchupPeriodId")),
-      # "winner" = schedule %>% purrr::map_chr(~purrr::pluck(.x, "winner")),
+      "winner" = schedule %>% purrr::map_chr(~ purrr::pluck(.x, "winner", .default = NA_character_)),
       "home_id" = h %>% purrr::map_int(~ purrr::pluck(.x, "teamId", .default = NA_integer_)),
       "away_id" = a %>% purrr::map_int(~ purrr::pluck(.x, "teamId", .default = NA_integer_)),
-      # "home_w" = h_score %>% purrr::map_dbl(~purrr::pluck(.x, "wins")),
       "home_points" = h %>% purrr::map_dbl(~ purrr::pluck(.x, "totalPoints", .default = 0)),
       "away_points" = a %>% purrr::map_dbl(~ purrr::pluck(.x, "totalPoints", .default = 0))
+    ) %>%
+    dplyr::mutate(
+      home_result = dplyr::case_when(
+        .data$winner == "HOME" ~ "W",
+        .data$winner == "AWAY" ~ "L",
+        .data$winner == "TIE"  ~ "T",
+        .data$winner == "UNDECIDED" ~ NA_character_,
+        # winner field missing/unrecognized (e.g. an older API shape) — fall
+        # back to the previous score-comparison heuristic rather than error.
+        is.na(.data$winner) & .data$home_points == 0 & .data$away_points == 0 ~ NA_character_,
+        is.na(.data$winner) & .data$home_points > .data$away_points ~ "W",
+        is.na(.data$winner) & .data$home_points < .data$away_points ~ "L",
+        is.na(.data$winner) ~ "T",
+        TRUE ~ NA_character_
+      ),
+      away_result = dplyr::case_when(
+        .data$home_result == "W" ~ "L",
+        .data$home_result == "L" ~ "W",
+        .data$home_result == "T" ~ "T",
+        TRUE ~ NA_character_
+      )
     )
+  scores <- scores %>% dplyr::select(-"winner")
+  # Relabel columns (not a sequential mutate/transmute) to build the
+  # away-team's-perspective mirror row — this must be a pure name swap, not
+  # `dplyr::transmute(home_id = away_id, away_id = home_id, ...)`, because
+  # transmute evaluates assignments in order and each new `home_id`/`away_id`
+  # would immediately overwrite the column later expressions read from,
+  # silently producing opponent_id == franchise_id (a team playing itself).
   scores2 <- scores
-  names(scores2) <- c("week", "away_id", "home_id", "away_points", "home_points")
+  names(scores2) <- c("week", "away_id", "home_id", "away_points", "home_points",
+                       "away_result", "home_result")
   schedule <-
     dplyr::bind_rows(scores, scores2) %>%
     dplyr::arrange(.data$week, .data$home_id, .data$away_id) %>%
@@ -61,16 +94,8 @@ ff_schedule.espn_conn <- function(conn, ...) {
       "franchise_id" = .data$home_id,
       "opponent_id" = .data$away_id,
       "franchise_score" = .data$home_points,
-      "opponent_score" = .data$away_points
-    ) %>%
-    dplyr::mutate(
-      result = dplyr::case_when(
-        .data$franchise_score > .data$opponent_score ~ "W",
-        .data$franchise_score < .data$opponent_score ~ "L",
-        # Game has not been played yet.
-        .data$franchise_score == 0 & .data$opponent_score == 0 ~ NA_character_,
-        TRUE ~ "T"
-      )
+      "opponent_score" = .data$away_points,
+      "result" = .data$home_result
     ) %>%
     dplyr::select(
       .data$week,
