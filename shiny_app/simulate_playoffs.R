@@ -194,11 +194,16 @@ simulate_season <- function(schedule_df, standings_df, n_trials = 10000, seed = 
     # Force specific matchups' win/loss for the "what if" UI, without
     # touching the underlying score draws — points_for (which still drives
     # wildcard/seed 3-6 selection) stays realistically variable even for a
-    # forced-outcome matchup. A team appears in at most one remaining
-    # matchup, so forced_a/forced_b can never both be TRUE for the same m.
+    # forced-outcome matchup. Scoped to the CURRENT week only: a team can
+    # appear in `remaining` once per week for the rest of the season, so
+    # matching on team ID alone (without the week filter) would force that
+    # team to win every one of their remaining games all season, not just
+    # this week's — forced_a/forced_b can never both be TRUE for the same m
+    # since a team is on only one side of its current-week matchup.
     if (length(forced_winners) > 0) {
-      forced_a <- remaining$team_a %in% forced_winners
-      forced_b <- remaining$team_b %in% forced_winners
+      is_current_week <- remaining$week == min(remaining$week)
+      forced_a <- is_current_week & (remaining$team_a %in% forced_winners)
+      forced_b <- is_current_week & (remaining$team_b %in% forced_winners)
       a_wins[, forced_a] <- TRUE
       a_wins[, forced_b] <- FALSE
     }
